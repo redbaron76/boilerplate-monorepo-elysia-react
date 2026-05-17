@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { registerSchema } from '@mono/shared';
-import { api } from '@/lib/api';
+import { api } from '@/libs/api';
 import { Mail, Lock, Eye, EyeOff, ArrowLeft } from 'lucide-react';
 
 export function RegisterPage() {

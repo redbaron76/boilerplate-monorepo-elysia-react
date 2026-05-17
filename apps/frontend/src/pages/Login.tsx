@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useAuthStore } from '@/stores/auth';
 import { loginSchema } from '@mono/shared';
-import { api } from '@/lib/api';
+import { api } from '@/libs/api';
 import { Mail, Lock, ArrowLeft } from 'lucide-react';
 
 export function LoginPage() {

@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/stores/auth';
-import { api } from '@/lib/api';
+import { api } from '@/libs/api';
 import {
   User,
   Mail,
