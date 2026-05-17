@@ -33,12 +33,12 @@ export function LoginPage() {
       setError('');
 
       try {
-        const response = await api.post('/auth/login', {
+        const response = await api.post<{ success: boolean; data: { accessToken: string; refreshToken: string; user: { id: string; email: string; name: string | null } } } | { success: boolean; message: string }>('/auth/login', {
           email: value.email,
           password: value.password,
         });
 
-        if (response.success) {
+        if ('data' in response && response.success) {
           setAuth({
             accessToken: response.data.accessToken,
             refreshToken: response.data.refreshToken,
@@ -111,9 +111,7 @@ export function LoginPage() {
                     </div>
                     {field.state.meta.errors?.length > 0 && (
                       <p className="text-sm text-destructive">
-                        {field.state.meta.errors.map(e =>
-                          typeof e === 'string' ? e : e.message
-                        ).join(', ')}
+                        {field.state.meta.errors.map(e => typeof e === 'string' ? e : (e as { message: string }).message).filter(Boolean).join(', ')}
                       </p>
                     )}
                   </div>
@@ -145,9 +143,7 @@ export function LoginPage() {
                     </div>
                     {field.state.meta.errors?.length > 0 && (
                       <p className="text-sm text-destructive">
-                        {field.state.meta.errors.map(e =>
-                          typeof e === 'string' ? e : e.message
-                        ).join(', ')}
+                        {field.state.meta.errors.map(e => typeof e === 'string' ? e : (e as { message: string }).message).filter(Boolean).join(', ')}
                       </p>
                     )}
                   </div>

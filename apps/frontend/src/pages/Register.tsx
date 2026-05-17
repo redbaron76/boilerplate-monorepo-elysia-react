@@ -55,7 +55,7 @@ export function RegisterPage() {
       setSuccess('');
 
       try {
-        const response = await api.post('/auth/register', {
+        const response = await api.post<{ success: boolean; message: string }>('/auth/register', {
           email: value.email,
           password: value.password,
         });
@@ -140,9 +140,7 @@ export function RegisterPage() {
                     </div>
                     {field.state.meta.errors?.length > 0 && (
                       <p className="text-sm text-destructive">
-                        {field.state.meta.errors.map(e =>
-                          typeof e === 'string' ? e : e.message
-                        ).join(', ')}
+                        {field.state.meta.errors.map(e => typeof e === 'string' ? e : (e as { message: string }).message).filter(Boolean).join(', ')}
                       </p>
                     )}
                   </div>
@@ -190,9 +188,7 @@ export function RegisterPage() {
                     )}
                     {field.state.meta.errors?.length > 0 && (
                       <p className="text-sm text-destructive">
-                        {field.state.meta.errors.map(e =>
-                          typeof e === 'string' ? e : e.message
-                        ).join(', ')}
+                        {field.state.meta.errors.map(e => typeof e === 'string' ? e : (e as { message: string }).message).filter(Boolean).join(', ')}
                       </p>
                     )}
                   </div>
@@ -224,9 +220,7 @@ export function RegisterPage() {
                     </div>
                     {field.state.meta.errors?.length > 0 && (
                       <p className="text-sm text-destructive">
-                        {field.state.meta.errors.map(e =>
-                          typeof e === 'string' ? e : e.message
-                        ).join(', ')}
+                        {field.state.meta.errors.map(e => typeof e === 'string' ? e : (e as { message: string }).message).filter(Boolean).join(', ')}
                       </p>
                     )}
                   </div>

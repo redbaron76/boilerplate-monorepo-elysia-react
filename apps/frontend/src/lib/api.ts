@@ -4,8 +4,16 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const { useAuthStore } = await import('@/stores/auth');
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...options?.headers,
   };
+
+  // Merge additional headers safely
+  if (options?.headers) {
+    if (typeof options.headers === 'object' && !Array.isArray(options.headers)) {
+      for (const [key, value] of Object.entries(options.headers)) {
+        if (typeof value === 'string') headers[key] = value;
+      }
+    }
+  }
 
   const accessToken = useAuthStore.getState().accessToken;
   if (accessToken) {
