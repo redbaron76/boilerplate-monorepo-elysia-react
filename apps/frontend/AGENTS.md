@@ -243,6 +243,32 @@ export function useUpdateProfileMutation() {
 - `onSettled` per invalidate e sincronizzare
 - `staleTime` default: 1 minuto per dati di profilo, 5 minuti per dati statici
 
+### Struttura API Layer
+
+I metodi asincroni usati da `useQueryOptions` vanno separati in file nella cartella `/apis` con nomi coerenti alla struttura dell'URL dell'endpoint.
+
+```
+src/
+├── apis/           # Metodi asincroni per ogni risorsa
+│   ├── users.ts    # /users/*, /protected/dashboard
+│   ├── profile.ts  # /protected/profile/*
+│   ├── auth.ts     # /api/auth/*
+│   └── index.ts    # Rexport di tutte le API
+├── hooks/          # useQueryOptions factory functions + hooks
+│   ├── useDashboardData.ts
+│   ├── useUserData.ts
+│   └── useProfile.ts
+└── libs/
+    └── query-keys.ts
+```
+
+**Regole API layer:**
+- Ogni file corrisponde a una risorsa (users.ts, profile.ts, auth.ts)
+- Nome del file = segmento principale dell'URL (es. `/users` → `users.ts`)
+- Funzioni separate per ogni operation: `getUsers`, `createUser`, `updateUser`
+- Funzioni esportano solo logiche async — zero business logic
+- Mai usare `fetch` direttamente nei componenti o negli hook
+
 ---
 
 ## 🛠️ State Management con Zustand
