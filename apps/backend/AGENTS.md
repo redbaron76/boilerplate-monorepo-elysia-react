@@ -143,6 +143,73 @@ import { registerSchema, loginSchema } from '@mono/shared';
 
 ---
 
+## 📄 Swagger / OpenAPI
+
+**Regola: SEMPRE usare il plugin Swagger di Elysia.**
+
+```typescript
+import { swagger } from '@elysiajs/swagger';
+
+const app = new Elysia()
+  .use(swagger({
+    path: '/swagger',
+    exclude: ['/api/auth/login', '/api/auth/register'],
+  }))
+  // ... rotte
+```
+
+**Configurazione:**
+- Path: `/swagger`
+- Escludere auth public endpoints (login/register) per non esporre in swagger
+- Documentare ogni rotta con `@swagger` JSDoc tags
+
+**Esempio JSDoc su rotta:**
+```typescript
+/**
+ * @swagger
+ * tags:
+ *   name: Auth
+ *   description: Endpoints di autenticazione
+ */
+.post('/register', async ({ body }) => {
+  /**
+   * @swagger
+   * /api/auth/register:
+   *   post:
+   *     summary: Registra un nuovo utente
+   *     tags: [Auth]
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             properties:
+   *               email:
+   *                 type: string
+   *               password:
+   *                 type: string
+   *     responses:
+   *       200:
+   *         description: Registrazione completata
+   *       400:
+   *         description: Validazione fallita
+   */
+}, {
+  body: t.Object({
+    email: t.String(),
+    password: t.String(),
+  }),
+})
+```
+
+**Console output:** Quando il server Elysia parte, stampare in console l'URL dello Swagger:
+```typescript
+console.log(`📘 Swagger UI disponibile su: http://localhost:3001/swagger`);
+```
+
+---
+
 ## 🛡️ Middleware e Protezione
 
 **Dove usare middleware:**

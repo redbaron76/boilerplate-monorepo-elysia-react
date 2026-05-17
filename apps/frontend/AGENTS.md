@@ -137,40 +137,110 @@ const form = useForm({
 
 **Regola: MAI usare Query direttamente nel componente.**
 
-```typescript
-// ❌ NO — query dentro il componente
-function Dashboard() {
-  const { data } = useQuery({ queryKey: ['dashboard'], queryFn: () => api.get('/protected/dashboard') });
-  // ...
-}
+### Pattern `useQueryOptions`
 
-// ✅ SÌ — hook dedicato
-// hooks/useDashboardData.ts
-import { useSuspenseQuery } from '@tanstack/react-query';
+Ogni query deve usare un function `useQueryOptions` che restituisce le opzioni, per massimizzare la riusabilità e centralizzare invalidation keys, staleTime, refetchOnWindowFocus, ecc.
+
+```typescript
+// libs/query-keys.ts — INVALIDATION KEYS CENTRALIZZATE
+export const queryKeys = {
+  dashboard: ['dashboard'] as const,
+  user: ['user'] as const,
+  userSettings: ['user', 'settings'] as const,
+  // ... ogni entità ha la propria key
+};
+
+// hooks/useDashboardData.ts — useQueryOptions pattern
+import { useSuspenseQuery, type QueryOptions } from '@tanstack/react-query';
+import { queryKeys } from '@/libs/query-keys';
 import { api } from '@/libs/api';
 
-export function useDashboardData() {
-  return useSuspenseQuery({
-    queryKey: ['dashboard'],
+// Factory function per le opzioni — riusabile ovunque
+export function useDashboardQueryOptions(): QueryOptions<DashboardResponse> {
+  return {
+    queryKey: queryKeys.dashboard,
     queryFn: () => api.get<DashboardResponse>('/protected/dashboard'),
-    staleTime: 1000 * 60, // 1 minuto
+    staleTime: 1000 * 60,       // 1 minuto
+    refetchOnWindowFocus: false, // solo invalidate manuale
+  };
+}
+
+// Hook dedicato — usa sempre useQueryOptions
+export function useDashboardData() {
+  return useSuspenseQuery(useDashboardQueryOptions());
+}
+
+// Stesso hook con useQuery (opzionale):
+export function useDashboardDataOptional() {
+  return useQuery(useDashboardQueryOptions());
+}
+```
+
+### Suspense + Optimistic Updates
+
+**Minimizzare isLoading: usare Suspense per dati obbligatori.**
+
+```typescript
+// Root con Suspense
+import { Suspense } from 'react';
+
+<Suspense fallback={<Loader2 className="animate-spin" />}>
+  <Dashboard />
+</Suspense>
+
+// Nell'hook — nessun loading state esplicito
+export function useDashboardData() {
+  const queryClient = useQueryClient();
+
+  return useSuspenseQuery({
+    ...useDashboardQueryOptions(),
+    // Optimistic update: modificare il cache direttamente
+    // se serve aggiornare dopo un'azione
   });
 }
 
-// Dashboard.tsx
-import { useDashboardData } from '@/hooks/useDashboardData';
+// Pattern per invalidate dopo mutation
+export function useUpdateProfileMutation() {
+  return useMutation({
+    mutationFn: (data: UpdateProfileInput) =>
+      api.put('/protected/profile', data),
+    onMutate: async (variables) => {
+      // 1. Pre-suspend — interrompe il refetch corrente
+      await queryClient.cancelQueries({ queryKey: queryKeys.user });
 
-function Dashboard() {
-  const { data } = useDashboardData(); // data è tipata e non undefined (suspense)
-  // ...
+      // 2. Snapshot del valore corrente
+      const previous = queryClient.getQueryData(queryKeys.user);
+
+      // 3. Aggiornamento optimistic
+      queryClient.setQueryData(queryKeys.user, (old) => ({
+        ...old,
+        ...variables,
+      }));
+
+      // 4. Restituisce contesto per rollback
+      return { previous };
+    },
+    onError: (_err, _vars, context) => {
+      // Rollback se la mutation fallisce
+      queryClient.setQueryData(queryKeys.user, context?.previous);
+    },
+    onSettled: () => {
+      // Invalida per sincronizzare
+      queryClient.invalidateQueries({ queryKey: queryKeys.user });
+    },
+  });
 }
 ```
 
 **Regole:**
-- Usare `useSuspenseQuery` quando i dati sono obbligatori per il componente
+- Usare `useSuspenseQuery` quando i dati sono obbligatori per il componente — il componente non gestisce loading/error separatamente, il Suspense boundaries gestisce
 - Usare `useQuery` quando i dati sono opzionali
-- Ogni endpoint API deve avere il proprio hook
-- Hook devono essere in `hooks/`
+- Ogni query deve avere un `useQueryOptions` factory function
+- Le invalidation keys sono centralizzate in `libs/query-keys.ts`
+- Le query keys sono `as const` per tipizzazione stretta
+- `onMutate` per optimistic update quando si modifica un dato
+- `onError` per rollback se l'API fallisce
+- `onSettled` per invalidate e sincronizzare
 - `staleTime` default: 1 minuto per dati di profilo, 5 minuti per dati statici
 
 ---
