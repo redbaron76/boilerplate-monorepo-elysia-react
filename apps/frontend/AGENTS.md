@@ -25,10 +25,19 @@ apps/frontend/
     ├── components/
     │   ├── ui/             # shadcn/ui components (button, card, input, alert, label)
     │   └── layout/         # Componenti layout (Header.tsx, Footer.tsx)
-    ├── hooks/              # Custom hooks (autenticazione, query, form, utility)
-    ├── libs/               # Utility e librerie (api.ts, utils.ts, validators.ts)
+    ├── apis/               # Metodi asincroni per ogni risorsa (users.ts, auth.ts, ecc.)
+    ├── hooks/              # Custom hooks (useQueryOptions, useSuspenseQuery, form, utility)
+    ├── libs/               # Utility e librerie (api.ts, utils.ts, query-keys.ts)
     └── stores/             # Zustand stores (auth.ts)
 ```
+
+**Regola: metodi asincroni in `/apis`**
+Tutti i metodi asincroni usati da `useQueryOptions` devono andare nella cartella `/apis` con nomi coerenti alla struttura dell'URL dell'endpoint:
+- `/users` → `apis/users.ts`
+- `/users/<id>` → `apis/users.ts` (funzione `getUserById`)
+- `/profile` → `apis/profile.ts`
+- `/auth` → `apis/auth.ts`
+- Ogni file esporta solo funzioni async, zero business logic
 
 **Regole fondamentali:**
 1. **Mai business logic nei componenti** — separare sempre in `hooks/` o `libs/`
