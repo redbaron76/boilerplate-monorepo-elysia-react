@@ -1,7 +1,7 @@
 # AGENTS.md — Backend (ElysiaJS)
 
 > **Stack**: ElysiaJS + TypeScript + Prisma + SQLite → PostgreSQL
-> **Per Hermes**: Segui queste regole per ogni modifica al backend. Committa dopo ogni cambiamento significativo.
+> **Per Hermes:** Segui queste regole per ogni modifica al backend. Committa dopo ogni cambiamento significativo.
 
 ## 📐 Struttura del Backend
 
@@ -30,6 +30,14 @@ apps/backend/
 - **Funzioni/variabili**: `camelCase`
 - **Middleware**: `camelCase` + suffisso `Middleware` se è un hook Elysia (`authMiddleware`, `rateLimitMiddleware`)
 - **Rotte**: nomi descrittivi, operazioni HTTP come prefix nelle commenti (`getUsers`, `createUser`, `updateUserProfile`)
+
+---
+
+## 📦 Pacchetti NPM — Sempre all'ultima versione
+
+**Regola:** Quando installi un pacchetto, usa SEMPRE l'ultima versione. `npm view elysia version` → usa `^<version>`.
+
+**Esempio:** `elysia` latest 1.4.28 → `"elysia": "^1.4.28"` in `package.json`.
 
 ---
 
@@ -95,7 +103,7 @@ const app = new Elysia()
     return { success: false, error: 'Rotta non trovata' };
   }
   set.status = 500;
-  return { success: false, error: 'Errore interno del server' };
+  return { success: false, error: 'Errore interno del server' }
 })
 ```
 
@@ -145,10 +153,12 @@ import { registerSchema, loginSchema } from '@mono/shared';
 
 ## 📄 Swagger / OpenAPI
 
-**Regola: SEMPRE usare il plugin Swagger di Elysia.**
+**Regola: SEMPRE usare il plugin OpenAPI/Swagger di Elysia.**
 
 ```typescript
 import { swagger } from '@elysiajs/swagger';
+// oppure
+import { openapi } from '@elysia/openapi';
 
 const app = new Elysia()
   .use(swagger({

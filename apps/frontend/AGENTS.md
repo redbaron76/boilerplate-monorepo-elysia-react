@@ -1,7 +1,7 @@
 # AGENTS.md — Frontend (React + TanStack)
 
 > **Stack**: React 19 + Vite + TypeScript + TanStack Router + TanStack Form + TanStack Query + Zustand + shadcn/ui + TailwindCSS v4
-> **Per Hermes**: Segui queste regole per ogni modifica al frontend. Committa dopo ogni cambiamento significativo.
+> **Per Hermes:** Segui queste regole per ogni modifica al frontend. Committa dopo ogni cambiamento significativo.
 
 ## 📐 Struttura del Frontend
 
@@ -27,7 +27,7 @@ apps/frontend/
     │   └── layout/         # Componenti layout (Header.tsx, Footer.tsx)
     ├── apis/               # Metodi asincroni per ogni risorsa (users.ts, auth.ts, ecc.)
     ├── hooks/              # Custom hooks (useQueryOptions, useSuspenseQuery, form, utility)
-    ├── libs/                # Utility e librerie (api.ts, utils.ts, query-keys.ts)
+    ├── libs/               # Utility e librerie (api.ts, utils.ts, query-keys.ts)
     └── stores/             # Zustand stores (auth.ts)
 ```
 
@@ -44,6 +44,14 @@ Tutti i metodi asincroni usati da `useQueryOptions` devono andare nella cartella
 2. **Mai usare TanStack Query direttamente nel componente** — creare sempre un hook dedicato (`useDashboardData`, `useUserData`)
 3. **Preferire `useSuspenseQuery` a `useQuery`** — usare il Suspense di React ove possibile
 4. **Non usare CSS vanilla** — solo TailwindCSS
+
+---
+
+## 📦 Pacchetti NPM — Sempre all'ultima versione
+
+**Regola:** Quando installi un pacchetto, usa SEMPRE l'ultima versione. `npm view react version` → usa `^<version>`.
+
+**Esempio:** `react` latest 19.2.6 → `"react": "^19.2.6"` in `package.json`.
 
 ---
 
@@ -151,7 +159,7 @@ const form = useForm({
 Ogni query deve usare un function `useQueryOptions` che restituisce le opzioni, per massimizzare la riusabilità e centralizzare invalidation keys, staleTime, refetchOnWindowFocus, ecc.
 
 ```typescript
-// libs/query-keys.ts — INVALIDATION KEYS CENTRALIZZATE
+// lib/query-keys.ts — INVALIDATION KEYS CENTRALIZZATE
 export const queryKeys = {
   dashboard: ['dashboard'] as const,
   user: ['user'] as const,
@@ -161,8 +169,8 @@ export const queryKeys = {
 
 // hooks/useDashboardData.ts — useQueryOptions pattern
 import { useSuspenseQuery, type QueryOptions } from '@tanstack/react-query';
-import { queryKeys } from '@/libs/query-keys';
-import { api } from '@/libs/api';
+import { queryKeys } from '@/lib/query-keys';
+import { api } from '@/lib/api';
 
 // Factory function per le opzioni — riusabile ovunque
 export function useDashboardQueryOptions(): QueryOptions<DashboardResponse> {
@@ -245,7 +253,7 @@ export function useUpdateProfileMutation() {
 - Usare `useSuspenseQuery` quando i dati sono obbligatori per il componente — il componente non gestisce loading/error separatamente, il Suspense boundaries gestisce
 - Usare `useQuery` quando i dati sono opzionali
 - Ogni query deve avere un `useQueryOptions` factory function
-- Le invalidation keys sono centralizzate in `libs/query-keys.ts`
+- Le invalidation keys sono centralizzate in `lib/query-keys.ts`
 - Le query keys sono `as const` per tipizzazione stretta
 - `onMutate` per optimistic update quando si modifica un dato
 - `onError` per rollback se l'API fallisce
@@ -267,7 +275,7 @@ src/
 │   ├── useDashboardData.ts
 │   ├── useUserData.ts
 │   └── useProfile.ts
-    └── libs/
+    └── lib/
         └── query-keys.ts
 ```
 
@@ -331,7 +339,7 @@ export const useAuthStore = create<AuthState>()(
 
 **Regole CSS:**
 - **MAI scrivere CSS custom** — solo classi Tailwind
-- Usare `cn()` da `@/libs/utils` per class merge con `clsx` + `tailwind-merge`
+- Usare `cn()` da `@/lib/utils` per class merge con `clsx` + `tailwind-merge`
 - Layout: Flexbox e Grid — evitare margini negativi e hack
 - Responsive: sm/md/lg breakpoints
 
@@ -340,7 +348,7 @@ export const useAuthStore = create<AuthState>()(
 ## 📡 API Client
 
 ```typescript
-// libs/api.ts
+// lib/api.ts
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {

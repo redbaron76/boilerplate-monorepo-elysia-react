@@ -55,6 +55,21 @@ test: add unit tests for password hashing utility
 
 ---
 
+## 📦 Pacchetti NPM — Sempre all'ultima versione
+
+**Regola fondamentale:** Quando aggiungi o aggiorni un pacchetto NPM, usa sempre l'ultima versione disponibile. Verifica la versione più recente su `npm` prima di impostare il versioning.
+
+**Workflow:**
+1. Cerca la versione latest: `npm view <package> version` o `curl -s https://registry.npmjs.org/<package> | grep latest`
+2. Imposta il versioning in `package.json` con il prefisso `^` (es. `^1.4.28`)
+3. Esegui `bun install`
+4. Verifica che build e typecheck passino
+5. Commit e push immediati
+
+**Non blocchere MAI una versione** a meno che non sia per compatibilità documentata con un'altra dipendenza.
+
+---
+
 ## ✅ Regole Generali di Codice
 
 1. **Codice pulito, organizzato, commentato** — sempre.
