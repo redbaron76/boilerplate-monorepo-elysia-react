@@ -7,7 +7,6 @@ import { protectedRoutes } from './routes/protected';
 const app = new Elysia()
   .use(
     openapi({
-      mode: 'stable',
       documentation: {
         info: {
           title: 'Boilerplate Monorepo API',

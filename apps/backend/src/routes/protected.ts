@@ -7,7 +7,7 @@ const authJwt = jwt({ name: 'jwt', secret: JWT_SECRET, exp: '15m' });
 
 export const protectedRoutes = new Elysia({ prefix: '/api/protected' })
   .use(authJwt)
-  .get('/dashboard', async ({ request, jwt: jwtHelper, error, set }) => {
+  .get('/dashboard', async ({ request, jwt: jwtHelper, set }) => {
     // Manually extract Bearer token from Authorization header
     const authHeader = request.headers.get('authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {

@@ -33,8 +33,13 @@ function decodeBase64(str: string): Uint8Array {
   return bytes;
 }
 
+function uint8ToHex(arr: Uint8Array): string {
+  return Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
 async function hashPassword(password: string): Promise<string> {
   const salt = crypto.getRandomValues(new Uint8Array(16));
+  const saltBuffer = salt.buffer as ArrayBuffer;
   const keyMaterial = await crypto.subtle.importKey(
     'raw',
     new TextEncoder().encode(password),
@@ -43,13 +48,13 @@ async function hashPassword(password: string): Promise<string> {
     ['deriveBits']
   );
   const derivedBits = await crypto.subtle.deriveBits(
-    { name: 'PBKDF2', salt, iterations: 100000, hash: 'SHA-256' },
+    { name: 'PBKDF2', salt: saltBuffer, iterations: 100000, hash: 'SHA-256' },
     keyMaterial,
     256
   );
   const hashBytes = new Uint8Array(derivedBits);
   const saltB64 = encodeBase64(salt);
-  const hashHex = Array.from(hashBytes).map(b => b.toString(16).padStart(2, '0')).join('');
+  const hashHex = uint8ToHex(hashBytes);
   return `${saltB64}:${hashHex}`;
 }
 
@@ -59,6 +64,7 @@ async function verifyPassword(password: string, stored: string): Promise<boolean
   const saltB64 = stored.slice(0, idx);
   const expectedHashHex = stored.slice(idx + 1);
   const salt = decodeBase64(saltB64);
+  const saltBuffer = salt.buffer as ArrayBuffer;
   const keyMaterial = await crypto.subtle.importKey(
     'raw',
     new TextEncoder().encode(password),
@@ -67,12 +73,12 @@ async function verifyPassword(password: string, stored: string): Promise<boolean
     ['deriveBits']
   );
   const derivedBits = await crypto.subtle.deriveBits(
-    { name: 'PBKDF2', salt, iterations: 100000, hash: 'SHA-256' },
+    { name: 'PBKDF2', salt: saltBuffer, iterations: 100000, hash: 'SHA-256' },
     keyMaterial,
     256
   );
   const hashBytes = new Uint8Array(derivedBits);
-  const hashHex = Array.from(hashBytes).map(b => b.toString(16).padStart(2, '0')).join('');
+  const hashHex = uint8ToHex(hashBytes);
   return hashHex === expectedHashHex;
 }
 
@@ -81,26 +87,31 @@ export const authRoutes = new Elysia({ prefix: '/api/auth' })
 
   .post(
     '/register',
-    async ({ body, error }) => {
+    async ({ body, set }) => {
       const parsed = registerSchema.safeParse(body);
       if (!parsed.success) {
-        return error(400, parsed.error.errors.map(e => e.message).join(', '));
+        set.status = 400;
+        return { success: false, error: parsed.error.issues.map(e => e.message).join(', ') };
       }
 
       const { email, password } = parsed.data;
 
       const existing = await prisma.user.findUnique({ where: { email } });
       if (existing) {
-        return error(409, 'Email già registrata');
+        set.status = 409;
+        return { success: false, error: 'Email già registrata' };
       }
 
       const passwordHash = await hashPassword(password);
+
+      const randomBytes = crypto.getRandomValues(new Uint8Array(32));
+      const refreshToken = uint8ToHex(randomBytes);
 
       const user = await prisma.user.create({
         data: {
           email,
           password: passwordHash,
-          refreshToken: crypto.getRandomValues(new Uint8Array(32)).toString('hex'),
+          refreshToken,
         },
       });
 
@@ -116,22 +127,25 @@ export const authRoutes = new Elysia({ prefix: '/api/auth' })
 
   .post(
     '/login',
-    async ({ body, jwt: jwtSign, error }) => {
+    async ({ body, set, jwt: jwtSign }) => {
       const parsed = loginSchema.safeParse(body);
       if (!parsed.success) {
-        return error(400, parsed.error.errors.map(e => e.message).join(', '));
+        set.status = 400;
+        return { success: false, error: parsed.error.issues.map(e => e.message).join(', ') };
       }
 
       const { email, password } = parsed.data;
 
       const user = await prisma.user.findUnique({ where: { email } });
       if (!user) {
-        return error(401, 'Credenziali non valide');
+        set.status = 401;
+        return { success: false, error: 'Credenziali non valide' };
       }
 
       const valid = await verifyPassword(password, user.password);
       if (!valid) {
-        return error(401, 'Credenziali non valide');
+        set.status = 401;
+        return { success: false, error: 'Credenziali non valide' };
       }
 
       const accessToken = await jwtSign.sign({
@@ -176,20 +190,23 @@ export const authRoutes = new Elysia({ prefix: '/api/auth' })
 
   .post(
     '/refresh',
-    async ({ body, jwt: jwtSign, error }) => {
+    async ({ body, set, jwt: jwtSign }) => {
       const { refreshToken: rt } = body;
       if (!rt) {
-        return error(400, 'Refresh token richiesto');
+        set.status = 400;
+        return { success: false, error: 'Refresh token richiesto' };
       }
 
       const decoded = await jwtSign.verify(rt);
       if (!decoded || decoded.type !== 'refresh') {
-        return error(401, 'Refresh token non valido');
+        set.status = 401;
+        return { success: false, error: 'Refresh token non valido' };
       }
 
       const dbUser = await prisma.user.findUnique({ where: { id: decoded.sub } });
       if (!dbUser || dbUser.refreshToken !== rt) {
-        return error(401, 'Refresh token non valido');
+        set.status = 401;
+        return { success: false, error: 'Refresh token non valido' };
       }
 
       const accessToken = await jwtSign.sign({
