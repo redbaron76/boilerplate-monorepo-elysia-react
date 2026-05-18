@@ -5,7 +5,7 @@
 ## 📐 Struttura del Progetto
 
 ```
-bun-monorepo/
+boilerplate-monorepo-elysia-react/
 ├── package.json          # Root workspace
 ├── bunfig.toml           # Configurazione Bun
 ├── apps/
@@ -58,7 +58,7 @@ test: add unit tests for password hashing utility
 ## ✅ Regole Generali di Codice
 
 1. **Codice pulito, organizzato, commentato** — sempre.
-2. **Mai business logic nei componenti** — separare in hooks (`hooks/`) o utilities (`libs/`).
+2. **Mai business logic nei componenti** — separare in hooks (`hooks/`) o utilities (`lib/`).
 3. **Metodi e funzioni sempre commentati** con:
    - Descrizione dello scopo
    - Chi lo usa

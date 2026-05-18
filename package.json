@@ -1,5 +1,5 @@
 {
-  "name": "bun-monorepo",
+  "name": "boilerplate-monorepo-elysia-react",
   "private": true,
   "workspaces": [
     "packages/*",
