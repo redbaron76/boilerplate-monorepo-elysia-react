@@ -12,6 +12,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': '/src',
+      '@mono/shared': '/opt/data/boilerplate-monorepo-elysia-react/packages/shared/src/index.ts',
     },
   },
   server: {

@@ -1,9 +1,22 @@
-import { Elysia } from 'elysia';
+import { Elysia, t } from 'elysia';
+import { openapi } from '@elysia/openapi';
 import { authRoutes } from './routes/auth';
 import { publicRoutes } from './routes/public';
 import { protectedRoutes } from './routes/protected';
 
 const app = new Elysia()
+  .use(
+    openapi({
+      mode: 'stable',
+      documentation: {
+        info: {
+          title: 'Boilerplate Monorepo API',
+          description: 'API REST per il monorepo Bun + ElysiaJS + React',
+          version: '1.0.0',
+        },
+      },
+    })
+  )
   .onError(({ code, error, set }) => {
     if (code === 'VALIDATION') {
       set.status = 400;
@@ -22,5 +35,6 @@ const app = new Elysia()
   .listen(3001);
 
 console.log(`🚀 Backend ElysiaJS su http://localhost:3001`);
+console.log(`📘 OpenAPI Swagger UI disponibile su: http://localhost:3001/swagger`);
 
 export default app;

@@ -8,7 +8,7 @@ import { Footer } from '@/components/layout/Footer';
  * Root layout — gestisce QueryClientProvider, Header, Footer e Outlet.
  * Espone il QueryClient come context per le rotte figlie.
  */
-export const rootRoute = createRootRouteWithContext<{ queryClient: QueryClient }>()({
+export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   component: RootComponent,
   notFoundComponent: NotFound,
 });
