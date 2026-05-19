@@ -1,5 +1,5 @@
 import { Elysia, t } from 'elysia';
-import { prisma } from '../db/prisma';
+import { db } from '../db';
 import { jwt } from '@elysiajs/jwt';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-key-change-in-production-2024';
@@ -22,15 +22,13 @@ export const protectedRoutes = new Elysia({ prefix: '/api/protected' })
       return { success: false, error: 'Token non valido o scaduto' };
     }
 
-    const dbUser = await prisma.user.findUnique({
-      where: { id: user.sub },
-      select: { id: true, email: true, name: true, createdAt: true },
-    });
-
-    if (!dbUser) {
+    const rows = await db.query<any[]>('SELECT id, email, name, created_at FROM users WHERE id = $1', [user.sub]);
+    if (rows.length === 0) {
       set.status = 404;
       return { success: false, error: 'Utente non trovato' };
     }
+
+    const dbUser = rows[0];
 
     return {
       success: true,

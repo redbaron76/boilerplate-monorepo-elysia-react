@@ -1,12 +1,16 @@
 import { Elysia, t } from 'elysia';
-import { openapi } from '@elysia/openapi';
+import { swagger } from '@elysiajs/swagger';
 import { authRoutes } from './routes/auth';
 import { publicRoutes } from './routes/public';
 import { protectedRoutes } from './routes/protected';
+import { db } from './db';
+
+// Initialize PGlite database before starting server
+await db.init();
 
 const app = new Elysia()
   .use(
-    openapi({
+    swagger({
       documentation: {
         info: {
           title: 'Boilerplate Monorepo API',
@@ -14,6 +18,7 @@ const app = new Elysia()
           version: '1.0.0',
         },
       },
+      path: '/swagger',
     })
   )
   .onError(({ code, error, set }) => {
@@ -26,6 +31,7 @@ const app = new Elysia()
       return { success: false, error: 'Rotta non trovata' };
     }
     set.status = 500;
+    console.error('SERVER ERROR:', error.message, '\n', error.stack);
     return { success: false, error: 'Errore interno del server' };
   })
   .use(publicRoutes)

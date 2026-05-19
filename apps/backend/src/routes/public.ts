@@ -1,5 +1,4 @@
 import { Elysia, t } from 'elysia';
-import { prisma } from '../db/prisma';
 
 export const publicRoutes = new Elysia({ prefix: '/api' })
   .get('/public/info', async () => {

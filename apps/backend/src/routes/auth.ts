@@ -1,6 +1,6 @@
 import { Elysia, t } from 'elysia';
 import { jwt } from '@elysiajs/jwt';
-import { prisma } from '../db/prisma';
+import { db } from '../db';
 import { registerSchema, loginSchema } from '@mono/shared';
 import { JWT_EXPIRY, REFRESH_TOKEN_EXPIRY } from '@mono/shared';
 
@@ -82,6 +82,20 @@ async function verifyPassword(password: string, stored: string): Promise<boolean
   return hashHex === expectedHashHex;
 }
 
+// Helper to convert PGlite row to plain object (timestamps come as strings)
+function normalizeUser(row: any): any {
+  if (!row) return null;
+  return {
+    id: Number(row.id),
+    email: row.email,
+    password: row.password_hash,
+    refreshToken: row.refresh_token,
+    name: row.name || null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
 export const authRoutes = new Elysia({ prefix: '/api/auth' })
   .use(authPlugin)
 
@@ -96,8 +110,9 @@ export const authRoutes = new Elysia({ prefix: '/api/auth' })
 
       const { email, password } = parsed.data;
 
-      const existing = await prisma.user.findUnique({ where: { email } });
-      if (existing) {
+      // Check if user exists
+      const existing = await db.query<any[]>('SELECT id FROM users WHERE email = $1', [email]);
+      if (existing.length > 0) {
         set.status = 409;
         return { success: false, error: 'Email già registrata' };
       }
@@ -107,13 +122,11 @@ export const authRoutes = new Elysia({ prefix: '/api/auth' })
       const randomBytes = crypto.getRandomValues(new Uint8Array(32));
       const refreshToken = uint8ToHex(randomBytes);
 
-      const user = await prisma.user.create({
-        data: {
-          email,
-          password: passwordHash,
-          refreshToken,
-        },
-      });
+      // Insert user
+      await db.query(
+        'INSERT INTO users (email, password_hash, refresh_token) VALUES ($1, $2, $3)',
+        [email, passwordHash, refreshToken]
+      );
 
       return { success: true, message: 'Registrazione completata' };
     },
@@ -136,11 +149,13 @@ export const authRoutes = new Elysia({ prefix: '/api/auth' })
 
       const { email, password } = parsed.data;
 
-      const user = await prisma.user.findUnique({ where: { email } });
-      if (!user) {
+      const rows = await db.query<any[]>('SELECT * FROM users WHERE email = $1', [email]);
+      if (rows.length === 0) {
         set.status = 401;
         return { success: false, error: 'Credenziali non valide' };
       }
+
+      const user = normalizeUser(rows[0]);
 
       const valid = await verifyPassword(password, user.password);
       if (!valid) {
@@ -160,10 +175,7 @@ export const authRoutes = new Elysia({ prefix: '/api/auth' })
         type: 'refresh',
       });
 
-      await prisma.user.update({
-        where: { id: user.id },
-        data: { refreshToken },
-      });
+      await db.query('UPDATE users SET refresh_token = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [refreshToken, user.id]);
 
       return {
         success: true,
@@ -203,8 +215,14 @@ export const authRoutes = new Elysia({ prefix: '/api/auth' })
         return { success: false, error: 'Refresh token non valido' };
       }
 
-      const dbUser = await prisma.user.findUnique({ where: { id: decoded.sub } });
-      if (!dbUser || dbUser.refreshToken !== rt) {
+      const rows = await db.query<any[]>('SELECT * FROM users WHERE id = $1', [decoded.sub]);
+      if (rows.length === 0) {
+        set.status = 401;
+        return { success: false, error: 'Refresh token non valido' };
+      }
+
+      const dbUser = normalizeUser(rows[0]);
+      if (dbUser.refreshToken !== rt) {
         set.status = 401;
         return { success: false, error: 'Refresh token non valido' };
       }
@@ -221,10 +239,7 @@ export const authRoutes = new Elysia({ prefix: '/api/auth' })
         type: 'refresh',
       });
 
-      await prisma.user.update({
-        where: { id: dbUser.id },
-        data: { refreshToken: newRefreshToken },
-      });
+      await db.query('UPDATE users SET refresh_token = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [newRefreshToken, dbUser.id]);
 
       return {
         success: true,
