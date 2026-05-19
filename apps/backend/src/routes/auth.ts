@@ -82,17 +82,17 @@ async function verifyPassword(password: string, stored: string): Promise<boolean
   return hashHex === expectedHashHex;
 }
 
-// Helper to convert PGlite row to plain object (timestamps come as strings)
-function normalizeUser(row: any): any {
-  if (!row) return null;
+// Helper to convert Prisma user to plain object (matches the old normalizeUser shape)
+function toPlainUser(user: Awaited<ReturnType<typeof db.user.findUnique>>): any {
+  if (!user) return null;
   return {
-    id: Number(row.id),
-    email: row.email,
-    password: row.password_hash,
-    refreshToken: row.refresh_token,
-    name: row.name || null,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
+    id: user.id,
+    email: user.email,
+    password: user.passwordHash,
+    refreshToken: user.refreshToken,
+    name: user.name || null,
+    createdAt: user.createdAt,
+    updatedAt: user.updatedAt,
   };
 }
 
@@ -111,8 +111,8 @@ export const authRoutes = new Elysia({ prefix: '/api/auth' })
       const { email, password } = parsed.data;
 
       // Check if user exists
-      const existing = await db.query<any[]>('SELECT id FROM users WHERE email = $1', [email]);
-      if (existing.length > 0) {
+      const existing = await db.user.findUnique({ where: { email } });
+      if (existing) {
         set.status = 409;
         return { success: false, error: 'Email già registrata' };
       }
@@ -123,10 +123,13 @@ export const authRoutes = new Elysia({ prefix: '/api/auth' })
       const refreshToken = uint8ToHex(randomBytes);
 
       // Insert user
-      await db.query(
-        'INSERT INTO users (email, password_hash, refresh_token) VALUES ($1, $2, $3)',
-        [email, passwordHash, refreshToken]
-      );
+      await db.user.create({
+        data: {
+          email,
+          passwordHash,
+          refreshToken,
+        },
+      });
 
       return { success: true, message: 'Registrazione completata' };
     },
@@ -149,15 +152,14 @@ export const authRoutes = new Elysia({ prefix: '/api/auth' })
 
       const { email, password } = parsed.data;
 
-      const rows = await db.query<any[]>('SELECT * FROM users WHERE email = $1', [email]);
-      if (rows.length === 0) {
+      const user = await db.user.findUnique({ where: { email } });
+      if (!user) {
         set.status = 401;
         return { success: false, error: 'Credenziali non valide' };
       }
 
-      const user = normalizeUser(rows[0]);
-
-      const valid = await verifyPassword(password, user.password);
+      const plainUser = toPlainUser(user);
+      const valid = await verifyPassword(password, plainUser.password);
       if (!valid) {
         set.status = 401;
         return { success: false, error: 'Credenziali non valide' };
@@ -169,19 +171,22 @@ export const authRoutes = new Elysia({ prefix: '/api/auth' })
         type: 'access',
       });
 
-      const refreshToken = await jwtSign.sign({
+      const loginRefreshToken = await jwtSign.sign({
         sub: user.id,
         email: user.email,
         type: 'refresh',
       });
 
-      await db.query('UPDATE users SET refresh_token = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [refreshToken, user.id]);
+      await db.user.update({
+        where: { id: user.id },
+        data: { refreshToken: loginRefreshToken, updatedAt: new Date() },
+      });
 
       return {
         success: true,
         data: {
           accessToken,
-          refreshToken,
+          refreshToken: loginRefreshToken,
           user: {
             id: user.id,
             email: user.email,
@@ -215,31 +220,33 @@ export const authRoutes = new Elysia({ prefix: '/api/auth' })
         return { success: false, error: 'Refresh token non valido' };
       }
 
-      const rows = await db.query<any[]>('SELECT * FROM users WHERE id = $1', [decoded.sub]);
-      if (rows.length === 0) {
+      const user = await db.user.findUnique({ where: { id: Number(decoded.sub) } });
+      if (!user) {
         set.status = 401;
         return { success: false, error: 'Refresh token non valido' };
       }
 
-      const dbUser = normalizeUser(rows[0]);
-      if (dbUser.refreshToken !== rt) {
+      if (user.refreshToken !== rt) {
         set.status = 401;
         return { success: false, error: 'Refresh token non valido' };
       }
 
       const accessToken = await jwtSign.sign({
-        sub: dbUser.id,
-        email: dbUser.email,
+        sub: user.id,
+        email: user.email,
         type: 'access',
       });
 
       const newRefreshToken = await jwtSign.sign({
-        sub: dbUser.id,
-        email: dbUser.email,
+        sub: user.id,
+        email: user.email,
         type: 'refresh',
       });
 
-      await db.query('UPDATE users SET refresh_token = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [newRefreshToken, dbUser.id]);
+      await db.user.update({
+        where: { id: user.id },
+        data: { refreshToken: newRefreshToken, updatedAt: new Date() },
+      });
 
       return {
         success: true,

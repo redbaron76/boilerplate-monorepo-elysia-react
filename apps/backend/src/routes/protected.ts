@@ -22,13 +22,15 @@ export const protectedRoutes = new Elysia({ prefix: '/api/protected' })
       return { success: false, error: 'Token non valido o scaduto' };
     }
 
-    const rows = await db.query<any[]>('SELECT id, email, name, created_at FROM users WHERE id = $1', [user.sub]);
-    if (rows.length === 0) {
+    const dbUser = await db.user.findUnique({
+      where: { id: Number(user.sub) },
+      select: { id: true, email: true, name: true, createdAt: true, updatedAt: true },
+    });
+
+    if (!dbUser) {
       set.status = 404;
       return { success: false, error: 'Utente non trovato' };
     }
-
-    const dbUser = rows[0];
 
     return {
       success: true,

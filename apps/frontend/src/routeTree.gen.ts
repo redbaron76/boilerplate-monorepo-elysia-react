@@ -11,9 +11,11 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as RegisterRouteImport } from './routes/register'
 import { Route as PublicRouteImport } from './routes/public'
+import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as NicknameNicknameRouteImport } from './routes/nickname/$nickname'
 
 const RegisterRoute = RegisterRouteImport.update({
   id: '/register',
@@ -23,6 +25,11 @@ const RegisterRoute = RegisterRouteImport.update({
 const PublicRoute = PublicRouteImport.update({
   id: '/public',
   path: '/public',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProfileRoute = ProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -40,43 +47,78 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const NicknameNicknameRoute = NicknameNicknameRouteImport.update({
+  id: '/nickname/$nickname',
+  path: '/nickname/$nickname',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
   '/login': typeof LoginRoute
+  '/profile': typeof ProfileRoute
   '/public': typeof PublicRoute
   '/register': typeof RegisterRoute
+  '/nickname/$nickname': typeof NicknameNicknameRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
   '/login': typeof LoginRoute
+  '/profile': typeof ProfileRoute
   '/public': typeof PublicRoute
   '/register': typeof RegisterRoute
+  '/nickname/$nickname': typeof NicknameNicknameRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
   '/login': typeof LoginRoute
+  '/profile': typeof ProfileRoute
   '/public': typeof PublicRoute
   '/register': typeof RegisterRoute
+  '/nickname/$nickname': typeof NicknameNicknameRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/dashboard' | '/login' | '/public' | '/register'
+  fullPaths:
+    | '/'
+    | '/dashboard'
+    | '/login'
+    | '/profile'
+    | '/public'
+    | '/register'
+    | '/nickname/$nickname'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/dashboard' | '/login' | '/public' | '/register'
-  id: '__root__' | '/' | '/dashboard' | '/login' | '/public' | '/register'
+  to:
+    | '/'
+    | '/dashboard'
+    | '/login'
+    | '/profile'
+    | '/public'
+    | '/register'
+    | '/nickname/$nickname'
+  id:
+    | '__root__'
+    | '/'
+    | '/dashboard'
+    | '/login'
+    | '/profile'
+    | '/public'
+    | '/register'
+    | '/nickname/$nickname'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DashboardRoute: typeof DashboardRoute
   LoginRoute: typeof LoginRoute
+  ProfileRoute: typeof ProfileRoute
   PublicRoute: typeof PublicRoute
   RegisterRoute: typeof RegisterRoute
+  NicknameNicknameRoute: typeof NicknameNicknameRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -93,6 +135,13 @@ declare module '@tanstack/react-router' {
       path: '/public'
       fullPath: '/public'
       preLoaderRoute: typeof PublicRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/profile': {
+      id: '/profile'
+      path: '/profile'
+      fullPath: '/profile'
+      preLoaderRoute: typeof ProfileRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -116,6 +165,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/nickname/$nickname': {
+      id: '/nickname/$nickname'
+      path: '/nickname/$nickname'
+      fullPath: '/nickname/$nickname'
+      preLoaderRoute: typeof NicknameNicknameRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -123,8 +179,10 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DashboardRoute: DashboardRoute,
   LoginRoute: LoginRoute,
+  ProfileRoute: ProfileRoute,
   PublicRoute: PublicRoute,
   RegisterRoute: RegisterRoute,
+  NicknameNicknameRoute: NicknameNicknameRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

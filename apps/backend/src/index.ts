@@ -5,8 +5,8 @@ import { publicRoutes } from './routes/public';
 import { protectedRoutes } from './routes/protected';
 import { db } from './db';
 
-// Initialize PGlite database before starting server
-await db.init();
+// Ensure Prisma is connected
+await db.$connect();
 
 const app = new Elysia()
   .use(
