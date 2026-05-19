@@ -7,7 +7,11 @@ import { Loader2 } from 'lucide-react';
 import { routeTree } from './routeTree.gen';
 import './index.css';
 
-const queryClient = new QueryClient({
+/**
+ * Entry point del frontend.
+ * Istanzia il router TanStack (file-based), QueryClient e monta l'app.
+ */
+export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 1000 * 60 * 5,
@@ -22,10 +26,6 @@ const router = createRouter({
   defaultPreload: 'intent',
 });
 
-/**
- * Entry point del frontend.
- * Istanzia il router TanStack (file-based), QueryClient e monta l'app.
- */
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>

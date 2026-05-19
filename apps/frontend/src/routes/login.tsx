@@ -6,6 +6,7 @@ import { login } from '@/apis/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { FieldError } from '@/components/FieldError';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useAuthStore } from '@/stores/auth';
@@ -36,7 +37,7 @@ export function LoginPage() {
     onSubmit: async ({ value }) => {
       const parseResult = loginSchema.safeParse(value);
       if (!parseResult.success) {
-        setError(parseResult.error.errors.map((e) => e.message).join(', '));
+        setError(parseResult.error.issues.map((e) => e.message).join(', '));
         return;
       }
 
@@ -117,11 +118,7 @@ export function LoginPage() {
                         placeholder="nome@esempio.it"
                       />
                     </div>
-                    {field.state.meta.errors?.length > 0 && (
-                      <p className="text-sm text-destructive">
-                        {field.state.meta.errors.map((e) => (typeof e === 'string' ? e : (e as { message: string }).message)).filter(Boolean).join(', ')}
-                      </p>
-                    )}
+                    <FieldError errors={field.state.meta.errors} />
                   </div>
                 )}
               </form.Field>
@@ -149,11 +146,7 @@ export function LoginPage() {
                         placeholder="••••••••"
                       />
                     </div>
-                    {field.state.meta.errors?.length > 0 && (
-                      <p className="text-sm text-destructive">
-                        {field.state.meta.errors.map((e) => (typeof e === 'string' ? e : (e as { message: string }).message)).filter(Boolean).join(', ')}
-                      </p>
-                    )}
+                    <FieldError errors={field.state.meta.errors} />
                   </div>
                 )}
               </form.Field>

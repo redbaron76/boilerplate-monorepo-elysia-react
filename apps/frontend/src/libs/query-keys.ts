@@ -26,6 +26,12 @@ export const queryKeys = {
   /** Profilo utente — /protected/profile */
   profile: ['profile'] as const,
 
+  /** Profilo pubblico per nickname — /profile/:nickname */
+  publicProfile: (nickname: string) => ['profile', 'public', nickname] as const,
+
+  /** Profilo proprio — /profile/me */
+  ownProfile: ['profile', 'own'] as const,
+
   /** Lista risorse (es. prodotti, ordini, ecc.) — da estendere */
   resources: ['resources'] as const,
 } as const;

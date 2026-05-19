@@ -26,8 +26,8 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
     body: options?.body,
   });
 
-  // Handle 401 - try token refresh
-  if (response.status === 401) {
+  // Handle 401 - try token refresh (skip for auth endpoints)
+  if (response.status === 401 && !url.startsWith('/auth/login') && !url.startsWith('/auth/register')) {
     const { refreshToken } = useAuthStore.getState();
     if (refreshToken) {
       try {
@@ -82,4 +82,5 @@ export const api = {
       method: 'PUT',
       body: body ? JSON.stringify(body) : undefined,
     }),
+  delete: <T>(url: string) => request<T>(url, { method: 'DELETE' }),
 };

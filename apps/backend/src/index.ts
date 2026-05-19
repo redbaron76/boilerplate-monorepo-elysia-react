@@ -2,6 +2,7 @@ import { Elysia, t } from 'elysia';
 import { swagger } from '@elysiajs/swagger';
 import { authRoutes } from './routes/auth';
 import { publicRoutes } from './routes/public';
+import { profileRoutes, protectedProfileRoutes } from './routes/profile';
 import { protectedRoutes } from './routes/protected';
 import { db } from './db';
 
@@ -35,8 +36,10 @@ const app = new Elysia()
     return { success: false, error: 'Errore interno del server' };
   })
   .use(publicRoutes)
+  .use(profileRoutes)
   .use(authRoutes)
   .use(protectedRoutes)
+  .use(protectedProfileRoutes)
   .listen(3001);
 
 console.log(`🚀 Backend ElysiaJS su http://localhost:3001`);

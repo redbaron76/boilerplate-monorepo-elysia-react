@@ -1,10 +1,9 @@
 import { Elysia, t } from 'elysia';
 import { jwt } from '@elysiajs/jwt';
 import { db } from '../db';
-import { registerSchema, loginSchema } from '@mono/shared';
-import { JWT_EXPIRY, REFRESH_TOKEN_EXPIRY } from '@mono/shared';
+import { registerSchema, loginSchema, getJwtConfig } from '@mono/shared';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-key-change-in-production-2024';
+const { secret: JWT_SECRET, expiry: JWT_EXPIRY } = getJwtConfig();
 
 export const authPlugin = jwt({
   name: 'jwt',

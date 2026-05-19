@@ -1,74 +1,318 @@
-# AGENTS.md — Backend (ElysiaJS)
+# AGENTS.md — Backend (ElysiaJS + TypeScript)
 
-> **Stack**: ElysiaJS + TypeScript + Prisma + SQLite → PostgreSQL
+> **Stack**: ElysiaJS 1.x + TypeScript + Prisma + Bun + Zustand (shared)
 > **Per Hermes:** Segui queste regole per ogni modifica al backend. Committa dopo ogni cambiamento significativo.
 
-## 📐 Struttura del Backend
+---
+
+## 📐 Struttura del Codice — Feature-Based
+
+Elysia è **unopinionated** sulla struttura, ma per chiarezza usiamo **feature-based architecture**:
 
 ```
-apps/backend/
-├── package.json
-├── prisma/
-│   ├── schema.prisma       # Modelli DB (SQLite in dev, PostgreSQL in prod)
-│   └── seed.ts             # Dati di seed iniziali
-└── src/
-    ├── index.ts            # Entry point — istanzia Elysia, monta middleware e rotte
-    ├── db/
-    │   └── prisma.ts       # Singola istanza Prisma (singleton pattern)
-    └── routes/
-        ├── auth.ts         # Rotte autenticazione (/api/auth/*)
-        ├── public.ts       # Rotte pubbliche (/api/*)
-        └── protected.ts    # Rotte protette (/api/protected/*)
+apps/backend/src/
+├── index.ts              # Entry point — istanzia Elysia, monta moduli, avvia server
+├── db/
+│   └── index.ts          # Singola istanza Prisma (singleton pattern)
+└── modules/
+    ├── auth/
+    │   ├── index.ts      # Controller Elysia (rotte /api/auth/*)
+    │   ├── service.ts    # Logica business (abstract class, static methods)
+    │   └── model.ts      # Schemi validazione Elysia.t per auth
+    ├── user/
+    │   ├── index.ts
+    │   ├── service.ts
+    │   └── model.ts
+    └── profile/
+        ├── index.ts
+        ├── service.ts
+        └── model.ts
 ```
 
-**Regola:** Ogni nuovo endpoint deve avere una cartella dedicata in `routes/`. Mai più di 50 linee per file di rotte — se cresce, separare in sottofile.
+**Perché feature-based:** Ogni feature ha controller, service e model raggruppati. Facilita refactoring e test.
+
+**Regola:** File di rotte >50 linee → separare in sottofile. Mai più di un handler per file quando possibile.
 
 ---
 
-## 🧑‍💻 Naming e Stile
+## 🧑‍💻 Best Practices ElysiaJS — DAL DOCUMENTO UFFICIALE
 
-- **Funzioni/variabili**: `camelCase`
-- **Middleware**: `camelCase` + suffisso `Middleware` se è un hook Elysia (`authMiddleware`, `rateLimitMiddleware`)
-- **Rotte**: nomi descrittivi, operazioni HTTP come prefix nelle commenti (`getUsers`, `createUser`, `updateUserProfile`)
+### ✅ 1. Elysia Instance Come Controller (non classi separate)
 
----
+**FARE** — Trattare un'istanza Elysia come controller stesso:
 
-## 📦 Pacchetti NPM — Sempre all'ultima versione
-
-**Regola:** Quando installi un pacchetto, usa SEMPRE l'ultima versione. `npm view elysia version` → usa `^<version>`.
-
-**Esempio:** `elysia` latest 1.4.28 → `"elysia": "^1.4.28"` in `package.json`.
-
----
-
-## 🔐 Autenticazione
-
-**Pattern JWT ElysiaJS**:
 ```typescript
-import { jwt } from '@elysiajs/jwt';
+// ✅ Do: Elysia instance = controller
+import { Elysia } from 'elysia';
+import { AuthService } from './service';
 
-const authPlugin = jwt({
+export const authController = new Elysia({ prefix: '/auth' })
+  .post('/login', async ({ body }) => {
+    const result = await AuthService.login(body);
+    return result;
+  }, {
+    body: AuthModel.loginBody,
+    response: {
+      200: AuthModel.loginResponse,
+      400: AuthModel.loginInvalid,
+    },
+  });
+```
+
+**NON FARE** — Classi che prendono Context Elysia:
+
+```typescript
+// ❌ Don't: Pass entire Context to a controller
+abstract class AuthController {
+  static login(context: Context) {  // ❌ Hard to type, loss of integrity
+    return AuthService.login(context.body);
+  }
+}
+```
+
+**Perché:** I tipi Elysia sono complessi e dipendenti da plugins. Passare `Context` completo causa loss di type integrity e vendor lock-in.
+
+---
+
+### ✅ 2. Service Pattern
+
+#### Service non-dependente dalla request → abstract class + static methods
+
+```typescript
+// ✅ Do: Service senza istanza (evita allocazione)
+export abstract class AuthService {
+  static async login({ email, password }: { email: string; password: string }) {
+    // ... logica business
+    return { token: 'xxx', user: { id: 1, email } };
+  }
+
+  static async validateToken(token: string) {
+    // ... logica business
+    return { id: 1, email: 'user@example.com' };
+  }
+}
+```
+
+#### Service dipendente dalla request → Elysia instance con macro
+
+```typescript
+// ✅ Do: Request-dependent service come Elysia instance
+const authGuard = new Elysia({ name: 'AuthGuard' })
+  .macro({
+    isAuthenticated: {
+      resolve({ cookie: { session }, status }) {
+        if (!session.value)
+          return status(401, 'Unauthorized') satisfies { success: false; error: string };
+        return { userId: Number(session.value) };
+      },
+    },
+  });
+```
+
+**Perché:** Plugin deduplicati automaticamente se hanno `name` (singleton). Elysia inferisce i tipi dal contesto.
+
+---
+
+### ✅ 3. Model — Usare Elysia.t (NON classi/interfacce separate)
+
+Elysia.t è il **single source of truth** per tipi e validazione runtime:
+
+```typescript
+// ✅ Do: Elysia.t validation schemas
+import { t, type UnwrapSchema } from 'elysia';
+
+export const AuthModel = {
+  loginBody: t.Object({
+    email: t.String({ minLength: 1 }),
+    password: t.String({ minLength: 6 }),
+  }),
+  loginResponse: t.Object({
+    success: t.Literal(true),
+    data: t.Object({
+      accessToken: t.String(),
+      refreshToken: t.String(),
+      user: t.Object({
+        id: t.Number(),
+        email: t.String(),
+      }),
+    }),
+  }),
+  loginInvalid: t.Object({
+    success: t.Literal(false),
+    error: t.String(),
+  }),
+} as const;
+
+// Opzionale: inferire i tipi dal model
+export type AuthModel = {
+  [k in keyof typeof AuthModel]: UnwrapSchema<typeof AuthModel[k]>;
+};
+```
+
+**NON FARE** — Dichiarare interfacce separate:
+
+```typescript
+// ❌ Don't: Interface separate
+interface ILoginRequest {
+  email: string;
+  password: string;
+}
+// ❌ Non collegata alla validazione runtime
+```
+
+---
+
+### ✅ 4. Guard per Enforce Type su Subroutes
+
+Usare `.guard()` per validare response type su gruppi di rotte:
+
+```typescript
+// ✅ Do: Enforce response type su rotte protette
+const protectedRoutes = new Elysia({ prefix: '/protected' })
+  .guard(
+    { response: t.Object({ success: t.Boolean() }) },
+    (app) =>
+      app
+        .get('/dashboard', async ({ jwt: jwtHelper }) => {
+          const user = await jwtHelper.verify(token);
+          return { success: true, user };
+        })
+        .get('/profile', async () => {
+          return { success: true, data: { nickname: 'test' } };
+        })
+  );
+```
+
+---
+
+### ✅ 5. Decorators Solo per Proprietà Dipendenti dalla Request
+
+```typescript
+// ✅ Do: Decorators solo per request-dependent data
+const app = new Elysia()
+  .decorate('requestIP', ({ request }) => request.headers.get('x-forwarded-for') || request.ip)
+  .decorate('requestTime', () => Date.now())
+  .decorate('session', ({ cookie }) => cookie.session.value)
+  .get('/', ({ requestIP, requestTime, session }) => {
+    return { requestIP, requestTime, session };
+  });
+```
+
+---
+
+### ✅ 6. Pattern JWT ElysiaJS (Aggiornato)
+
+```typescript
+import { Elysia, t } from 'elysia';
+import { jwt } from '@elysiajs/jwt';
+import { db } from '../../db';
+import { getJwtConfig, AuthModel } from '@mono/shared';
+
+const { secret: JWT_SECRET, expiry: JWT_EXPIRY } = getJwtConfig();
+
+// Plugin JWT — nome univoco per deduplicazione
+const authJwtPlugin = jwt({
   name: 'jwt',
-  secret: process.env.JWT_SECRET || 'CHANGE_ME',
-  exp: JWT_EXPIRY, // 15m — definito in @mono/shared
+  secret: JWT_SECRET,
+  exp: JWT_EXPIRY, // 15m
 });
 
-// Montare sulle rotte
-const app = new Elysia()
-  .use(authPlugin)
-  .use(protectedRoutes);
+// Controller — Elysia instance
+export const authController = new Elysia({ prefix: '/auth' })
+  .use(authJwtPlugin)
+
+  .post('/register', async ({ body, set }) => {
+    const parsed = AuthModel.registerBody.safeParse(body);
+    if (!parsed.success) {
+      set.status = 400;
+      return parsed.error.issues.map((e) => e.message).join(', ');
+    }
+
+    const existing = await db.user.findUnique({ where: { email: parsed.data.email } });
+    if (existing) {
+      set.status = 409;
+      return { success: false, error: 'Email già registrata' };
+    }
+
+    const passwordHash = await AuthService.hashPassword(parsed.data.password);
+    await db.user.create({
+      data: { email: parsed.data.email, passwordHash },
+    });
+
+    return { success: true, message: 'Registrazione completata' };
+  }, {
+    body: AuthModel.registerBody,
+    response: {
+      200: AuthModel.registerSuccess,
+      400: AuthModel.registerInvalid,
+      409: AuthModel.registerConflict,
+    },
+  })
+
+  .post('/login', async ({ body, set, jwt: jwtSign }) => {
+    const parsed = AuthModel.loginBody.safeParse(body);
+    if (!parsed.success) {
+      set.status = 400;
+      return { success: false, error: 'Campi obbligatori mancanti' };
+    }
+
+    const user = await db.user.findUnique({ where: { email: parsed.data.email } });
+    if (!user) {
+      set.status = 401;
+      return { success: false, error: 'Credenziali non valide' };
+    }
+
+    const valid = await AuthService.verifyPassword(parsed.data.password, user.passwordHash);
+    if (!valid) {
+      set.status = 401;
+      return { success: false, error: 'Credenziali non valide' };
+    }
+
+    const accessToken = await jwtSign.sign({
+      sub: user.id,
+      email: user.email,
+      type: 'access',
+    });
+
+    const refreshToken = await jwtSign.sign({
+      sub: user.id,
+      email: user.email,
+      type: 'refresh',
+    });
+
+    await db.user.update({
+      where: { id: user.id },
+      data: { refreshToken, updatedAt: new Date() },
+    });
+
+    return {
+      success: true,
+      data: {
+        accessToken,
+        refreshToken,
+        user: { id: user.id, email: user.email, name: user.name },
+      },
+    };
+  }, {
+    body: AuthModel.loginBody,
+    response: {
+      200: AuthModel.loginResponse,
+      400: AuthModel.loginInvalid,
+      401: AuthModel.loginInvalid,
+    },
+  });
 ```
 
-**Regole:**
-- Access token: 15 minuti (JWT_EXPIRY in shared)
-- Refresh token: 7 giorni (REFRESH_TOKEN_EXPIRY in shared)
+**Regole JWT:**
+- `name` univoco per ogni plugin JWT (`jwt`, `profile-jwt`)
+- Secret e expiry da `getJwtConfig()` — centralizzato in shared
 - Token sempre `type: 'access' | 'refresh'` nel payload
-- Password sempre hashate con PBKDF2 (non mai in chiaro)
-- Refresh token rotation: ogni refresh genera un nuovo token
+- Refresh token rotation: ogni login/refresh genera nuovo token
+- Store refresh token in DB per validazione
 
 ---
 
-## 📡 API Responses
+### ✅ 7. API Response Format
 
 **Formato standard** (sempre questi due):
 
@@ -81,84 +325,68 @@ const app = new Elysia()
 ```
 
 **Codici HTTP:**
-| Codice | Uso |
-|--------|-----|
-| 200 | OK — successo |
-| 201 | Created — risorsa creata |
-| 400 | Bad Request — validazione fallita |
-| 401 | Unauthorized — autenticazione mancata o token scaduto |
-| 404 | Not Found — risorsa non esistente |
-| 409 | Conflict — risorsa già esistente (es. email duplicata) |
-| 500 | Internal Server Error |
+- `200` OK — successo
+- `201` Created — risorsa creata
+- `400` Bad Request — validazione fallita
+- `401` Unauthorized — auth mancata o token scaduto
+- `403` Forbidden — permesso negato
+- `404` Not Found — risorsa non esistente
+- `409` Conflict — risorsa già esistente
+- `500` Internal Server Error
 
-**Middleware globale errori** (`index.ts`):
+**Middleware globale errori (`index.ts`):**
+
 ```typescript
-.onError(({ code, error, set }) => {
-  if (code === 'VALIDATION') {
-    set.status = 400;
-    return { success: false, error: error.message };
-  }
-  if (code === 'NOT_FOUND') {
-    set.status = 404;
-    return { success: false, error: 'Rotta non trovata' };
-  }
-  set.status = 500;
-  return { success: false, error: 'Errore interno del server' }
-})
+const app = new Elysia()
+  .onError(({ code, error, set }) => {
+    if (code === 'VALIDATION') {
+      set.status = 400;
+      return { success: false, error: error.message };
+    }
+    if (code === 'NOT_FOUND') {
+      set.status = 404;
+      return { success: false, error: 'Rotta non trovata' };
+    }
+    set.status = 500;
+    return { success: false, error: 'Errore interno del server' };
+  });
 ```
 
 ---
 
-## 🧪 Validazione
+### ✅ 8. Schema & Validazione
 
-**Regola:** Validazione **sempre** con Zod, definita nel package `@mono/shared`.
+Elysia supporta **Standard Schema** — usa la libreria preferita:
+- Elysia.t (built-in, preferita)
+- Zod (`z.object(...)`)
+- Valibot, ArkType, Effect Schema, Yup, Joi
 
 ```typescript
-// In routes/auth.ts
-import { registerSchema, loginSchema } from '@mono/shared';
+// ✅ Do: Elysia.t (single source of truth)
+import { t } from 'elysia';
 
-.post('/register', async ({ body }) => {
-  const parsed = registerSchema.safeParse(body);
-  if (!parsed.success) {
-    return error(400, parsed.error.errors.map(e => e.message).join(', '));
-  }
-  // ...
-}, {
-  body: t.Object({
-    email: t.String(),
-    password: t.String(),
-  }),
-})
+.body(t.Object({
+  email: t.String(),
+  password: t.String({ minLength: 6 }),
+}))
+
+// ✅ Alternative: Zod (se preferito dal team)
+import { z } from 'zod';
+
+.body(z.object({
+  email: z.string(),
+  password: z.string().min(6),
+}))
 ```
 
-**Non scrivere schemi Zod nel backend** — usa sempre quelli del shared package.
+**Perché:** Elysia inferisce i tipi automaticamente da qualsiasi Standard Schema compliant.
 
 ---
 
-## 🗄️ Database (Prisma)
-
-**Regole:**
-- Singola istanza `prisma` — singleton pattern in `db/prisma.ts`
-- Mai fare `new PrismaClient()` in ogni file
-- Ambient development: SQLite (`file:./dev.db`)
-- Ambient production: PostgreSQL (con migration plan)
-- Migration: `prisma migrate dev --name <descrizione>`
-- Seed: `prisma db seed` (file seed.ts separato)
-
-**Naming modelli:** PascalCase (`User`, `Product`, `Order`)
-**Naming campi:** camelCase (`createdAt`, `updatedAt`, `firstName`)
-**Timestamps:** sempre `@default(now())` e `@updatedAt`
-
----
-
-## 📄 Swagger / OpenAPI
-
-**Regola: SEMPRE usare il plugin OpenAPI/Swagger di Elysia.**
+### ✅ 9. OpenAPI / Swagger
 
 ```typescript
 import { swagger } from '@elysiajs/swagger';
-// oppure
-import { openapi } from '@elysia/openapi';
 
 const app = new Elysia()
   .use(swagger({
@@ -166,98 +394,117 @@ const app = new Elysia()
     exclude: ['/api/auth/login', '/api/auth/register'],
   }))
   // ... rotte
+  .listen(3001);
+
+console.log(`📘 Swagger UI: http://localhost:3001/swagger`);
 ```
 
 **Configurazione:**
 - Path: `/swagger`
-- Escludere auth public endpoints (login/register) per non esporre in swagger
-- Documentare ogni rotta con `@swagger` JSDoc tags
+- Escludere auth public endpoints (login/register)
+- Documentare ogni rotta con `@swagger` JSDoc
+- Usare `@swagger` tags per raggruppare endpoint
 
-**Esempio JSDoc su rotta:**
-```typescript
-/**
- * @swagger
- * tags:
- *   name: Auth
- *   description: Endpoints di autenticazione
- */
-.post('/register', async ({ body }) => {
-  /**
-   * @swagger
-   * /api/auth/register:
-   *   post:
-   *     summary: Registra un nuovo utente
-   *     tags: [Auth]
-   *     requestBody:
-   *       required: true
-   *       content:
-   *         application/json:
-   *           schema:
-   *             type: object
-   *             properties:
-   *               email:
-   *                 type: string
-   *               password:
-   *                 type: string
-   *     responses:
-   *       200:
-   *         description: Registrazione completata
-   *       400:
-   *         description: Validazione fallita
-   */
-}, {
-  body: t.Object({
-    email: t.String(),
-    password: t.String(),
-  }),
-})
-```
+---
 
-**Console output:** Quando il server Elysia parte, stampare in console l'URL dello Swagger:
+### ✅ 10. Testing
+
+Testare i controller con `.handle()`:
+
 ```typescript
-console.log(`📘 Swagger UI disponibile su: http://localhost:3001/swagger`);
+import { describe, it, expect } from 'bun:test';
+import { Elysia } from 'elysia';
+
+const app = new Elysia()
+  .get('/hello', () => 'world');
+
+describe('Controller', () => {
+  it('should return hello', async () => {
+    const response = await app
+      .handle(new Request('http://localhost/hello'))
+      .then((x) => x.text());
+
+    expect(response).toBe('world');
+  });
+});
 ```
 
 ---
 
-## 🛡️ Middleware e Protezione
+## 🧑‍💻 Naming e Stile
 
-**Dove usare middleware:**
-- Rotte `protected/*` — sempre JWT validation
-- Rate limiting su `/api/auth/login` (max 5 tentativi/min)
-- CORS — configurato in `index.ts` per il frontend
-
-**Pattern auth guard:**
-```typescript
-.get('/dashboard', async ({ jwt: jwtHelper, error }) => {
-  const user = await jwtHelper.verify(token);
-  if (!user) return error(401, 'Token non valido');
-  // ...
-})
-```
+- **Funzioni/variabili**: `camelCase`
+- **Middleware**: `camelCase` + suffisso (es. `authMiddleware`, `rateLimitMiddleware`)
+- **Rotte**: nomi descrittivi (`getUsers`, `createUser`, `updateUserProfile`)
+- **Constants**: `UPPER_SNAKE_CASE` per config (es. `JWT_SECRET`, `JWT_EXPIRY`)
+- **File**: `camelCase.ts` per moduli, `PascalCase.tsx` per componenti
 
 ---
 
-## 📝 Commenti Obbligatori
+## 📦 Pacchetti NPM
 
-Ogni funzione/metodo pubblico deve avere:
-```typescript
-/**
- * Hash della password dell'utente con PBKDF2.
- * Usato da: authRoutes.register, authRoutes.login
- * Dove: apps/backend/src/routes/auth.ts
- * Esempio: const hash = await hashPassword('user-password');
- */
-async function hashPassword(password: string): Promise<string> { ... }
-```
+**Regola:** Quando installi un pacchetto, usa SEMPRE l'ultima versione.
+`bunpm view elysia version` → usa `^<version>` in `package.json`.
+
+**Versioni attuali (aggiornare periodicamente):**
+- `elysia`: ^1.4.28
+- `@elysiajs/jwt`: latest
+- `@elysiajs/swagger`: latest
+- `prisma`: latest
+- `@prisma/client`: latest
 
 ---
 
-## ✅ Checklist Modifica Backend
+## 🔐 Autenticazione — Riepilogo
 
-- [ ] La validazione usa schemi Zod dal shared package?
-- [ ] Le risposte seguono il formato `{ success, data/error }`?
-- [ ] I commenti sono presenti su tutte le funzioni pubbliche?
-- [ ] Il nome del file segue `camelCase.ts` o `PascalCase.tsx`?
-- [ ] Il commit è descrittivo (Conventional Commits)?
-- [ ] È presente un test per la logica business?
+**Pattern JWT:**
+```typescript
+const { secret, expiry } = getJwtConfig(); // ← da @mono/shared
+
+const authPlugin = jwt({
+  name: 'jwt',           // ← nome univoco per il contesto
+  secret: secret,        // ← mai hardcoded
+  exp: expiry,           // ← 15m per access, 7d per refresh
+});
+```
+
+**Regole di sicurezza:**
+- Access token: 15 minuti (`JWT_EXPIRY` in shared)
+- Refresh token: 7 giorni (`REFRESH_TOKEN_EXPIRY` in shared)
+- Token payload: `type: 'access' | 'refresh'`
+- Password: PBKDF2 (100k iterazioni, SHA-256)
+- Refresh token rotation: generare nuovo token a ogni refresh
+- JWT_SECRET: variabile d'ambiente, fallback da shared
+
+---
+
+## 🗄️ Database (Prisma)
+
+**Regole:**
+- Singola istanza `prisma` — singleton in `db/index.ts`
+- Mai `new PrismaClient()` in ogni file
+- Dev: SQLite (`file:./dev.db`)
+- Prod: PostgreSQL (con migration plan)
+- Migration: `prisma migrate dev --name <descrizione>`
+- Seed: `prisma db seed` (file seed.ts separato)
+
+**Naming:**
+- Modelli: PascalCase (`User`, `Product`, `Order`)
+- Campi: camelCase (`createdAt`, `updatedAt`, `firstName`)
+- Timestamps: `@default(now())` e `@updatedAt`
+
+---
+
+## 📝 Checklist Modifica Backend
+
+- [ ] Struttura feature-based (index.ts + service.ts + model.ts)?
+- [ ] Controller è Elysia instance (non classe con Context)?
+- [ ] Model usa Elysia.t (non interfacce/classi separate)?
+- [ ] Service usa abstract class + static methods?
+- [ ] API response formato `{ success, data/error }`?
+- [ ] JWT plugin ha `name` univoco?
+- [ ] JWT secret da `getJwtConfig()` (non hardcoded)?
+- [ ] Risposta type enforced con `.guard()` o `.response`?
+- [ ] JSDoc commenti su funzioni pubbliche?
+- [ ] Test per logica business?
+- [ ] Commit descrittivo (Conventional Commits)?

@@ -6,6 +6,7 @@ import { register } from '@/apis/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { FieldError } from '@/components/FieldError';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Mail, Lock, Eye, EyeOff, ArrowLeft } from 'lucide-react';
@@ -39,7 +40,7 @@ export function RegisterPage() {
       // Form-level cross-field validation using Zod schema
       const result = registerFullSchema.safeParse(value);
       if (!result.success) {
-        const fieldErrors = result.error.errors.map((e) => e.message);
+        const fieldErrors = result.error.issues.map((e) => e.message);
         setError(fieldErrors.join('; '));
         return;
       }
@@ -134,11 +135,7 @@ export function RegisterPage() {
                         placeholder="nome@esempio.it"
                       />
                     </div>
-                    {field.state.meta.errors?.length > 0 && (
-                      <p className="text-sm text-destructive">
-                        {field.state.meta.errors.map((e) => (typeof e === 'string' ? e : (e as { message: string }).message)).filter(Boolean).join(', ')}
-                      </p>
-                    )}
+                    <FieldError errors={field.state.meta.errors} />
                   </div>
                 )}
               </form.Field>
@@ -182,11 +179,7 @@ export function RegisterPage() {
                         <p className={`text-xs ${strength.color}`}>{strength.label}</p>
                       </div>
                     )}
-                    {field.state.meta.errors?.length > 0 && (
-                      <p className="text-sm text-destructive">
-                        {field.state.meta.errors.map((e) => (typeof e === 'string' ? e : (e as { message: string }).message)).filter(Boolean).join(', ')}
-                      </p>
-                    )}
+                    <FieldError errors={field.state.meta.errors} />
                   </div>
                 )}
               </form.Field>
@@ -214,11 +207,7 @@ export function RegisterPage() {
                         placeholder="Ripeti la password"
                       />
                     </div>
-                    {field.state.meta.errors?.length > 0 && (
-                      <p className="text-sm text-destructive">
-                        {field.state.meta.errors.map((e) => (typeof e === 'string' ? e : (e as { message: string }).message)).filter(Boolean).join(', ')}
-                      </p>
-                    )}
+                    <FieldError errors={field.state.meta.errors} />
                   </div>
                 )}
               </form.Field>

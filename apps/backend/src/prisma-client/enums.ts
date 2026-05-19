@@ -9,7 +9,11 @@
 * 🟢 You can import this file directly.
 */
 
+export const ProfileGender = {
+  MALE: 'MALE',
+  FEMALE: 'FEMALE',
+  NON_BINARY: 'NON_BINARY',
+  PREFER_NOT_TO_SAY: 'PREFER_NOT_TO_SAY'
+} as const
 
-
-// This file is empty because there are no enums in the schema.
-export {}
+export type ProfileGender = (typeof ProfileGender)[keyof typeof ProfileGender]

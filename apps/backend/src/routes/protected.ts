@@ -1,9 +1,10 @@
 import { Elysia, t } from 'elysia';
 import { db } from '../db';
 import { jwt } from '@elysiajs/jwt';
+import { getJwtConfig } from '@mono/shared';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-key-change-in-production-2024';
-const authJwt = jwt({ name: 'jwt', secret: JWT_SECRET, exp: '15m' });
+const { secret: JWT_SECRET, expiry: JWT_EXPIRY } = getJwtConfig();
+const authJwt = jwt({ name: 'jwt', secret: JWT_SECRET, exp: JWT_EXPIRY });
 
 export const protectedRoutes = new Elysia({ prefix: '/api/protected' })
   .use(authJwt)

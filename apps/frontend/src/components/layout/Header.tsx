@@ -48,6 +48,12 @@ export function Header() {
                 >
                   Dashboard
                 </Link>
+                <Link
+                  to="/settings"
+                  className="px-4 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-all"
+                >
+                  Impostazioni
+                </Link>
                 <span className="px-3 py-2 text-sm text-muted-foreground hidden lg:inline">
                   Ciao, {user?.name || user?.email.split('@')[0]}
                 </span>
@@ -111,6 +117,13 @@ export function Header() {
                   onClick={() => setMobileOpen(false)}
                 >
                   Dashboard
+                </Link>
+                <Link
+                  to="/settings"
+                  className="block px-4 py-3 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-all"
+                  onClick={() => setMobileOpen(false)}
+                >
+                  Impostazioni
                 </Link>
                 <span className="block px-4 py-2 text-sm text-muted-foreground">
                   Ciao, {user?.name || user?.email.split('@')[0]}
