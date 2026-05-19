@@ -44,3 +44,7 @@ yarn-error.log*
 # Cache
 .caches/
 .vite/
+
+# PGlite data
+
+pglite-data/
