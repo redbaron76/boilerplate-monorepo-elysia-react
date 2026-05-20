@@ -1,4 +1,4 @@
-import { useSuspenseQuery, type UseSuspenseQueryOptions } from '@tanstack/react-query';
+import { useSuspenseQuery, queryOptions } from '@tanstack/react-query';
 import { queryKeys } from '@/libs/query-keys';
 import { api } from '@/libs/api';
 
@@ -17,27 +17,23 @@ export interface DashboardResponse {
 
 /**
  * Factory per le opzioni della query dashboard.
- * Centralizza queryKey, queryFn, staleTime e refetchOnWindowFocus.
- * @returns QueryOptions per la dashboard
+ * Usa queryOptions helper per type-safety e riusabilità.
  */
-export function useDashboardQueryOptions(): UseSuspenseQueryOptions<DashboardResponse> {
-  return {
+export function useDashboardQueryOptions() {
+  return queryOptions({
     queryKey: queryKeys.dashboard,
     queryFn: () => api.get<DashboardResponse>('/protected/dashboard'),
-  };
+    staleTime: 1000 * 60,       // 1 minuto
+    gcTime: 1000 * 60 * 5,      // 5 minuti garbage collection
+    refetchOnWindowFocus: false, // solo invalidate manuale
+  });
 }
 
 /**
  * Hook dedicato per i dati della dashboard.
- * Usa useSuspenseQuery — il componente non gestisce loading/error separatamente.
+ * Usa useSuspenseQuery — il componente non gestisce loading/error.
  * Il Suspense boundary gestisce lo stato di caricamento.
- * @returns Dati della dashboard
  */
 export function useDashboardData() {
-  const queryOptions = useDashboardQueryOptions();
-  return useSuspenseQuery({
-    ...queryOptions,
-    staleTime: 1000 * 60, // 1 minuto
-    refetchOnWindowFocus: false, // solo invalidate manuale
-  });
+  return useSuspenseQuery(useDashboardQueryOptions());
 }

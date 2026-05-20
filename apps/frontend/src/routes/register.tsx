@@ -1,4 +1,4 @@
-import { createFileRoute } from '@tanstack/react-router';
+import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
 import { useForm } from '@tanstack/react-form';
 import { registerFullSchema, registerWithConfirmSchema } from '@/libs/auth-schemas';
@@ -25,6 +25,7 @@ export const Route = createFileRoute('/register')({
  * Gestisce il form di creazione account con validazione completo.
  */
 export function RegisterPage() {
+  const navigate = useNavigate();
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
@@ -57,7 +58,8 @@ export function RegisterPage() {
 
         setSuccess(response.message || 'Registrazione completata! Reindirizzamento al login...');
         setTimeout(() => {
-          window.location.href = '/login';
+          // ✅ TanStack Router navigate — preserva stato in memoria
+          navigate({ to: '/login' });
         }, 2000);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Errore durante la registrazione');

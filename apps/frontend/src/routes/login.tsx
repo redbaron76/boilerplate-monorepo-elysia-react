@@ -1,4 +1,4 @@
-import { createFileRoute } from '@tanstack/react-router';
+import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
 import { useForm } from '@tanstack/react-form';
 import { loginSchema } from '@mono/shared';
@@ -25,6 +25,7 @@ export const Route = createFileRoute('/login')({
  * Pagina di login — gestisce autenticazione utente con email/password.
  */
 export function LoginPage() {
+  const navigate = useNavigate();
   const setAuth = useAuthStore((s) => s.setAuth);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -53,7 +54,8 @@ export function LoginPage() {
             refreshToken: response.data.refreshToken,
             user: response.data.user,
           });
-          window.location.href = '/dashboard';
+          // ✅ TanStack Router navigate — preserva stato in memoria (no page reload)
+          navigate({ to: '/dashboard' });
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Errore durante il login');

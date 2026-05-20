@@ -1,6 +1,6 @@
 # AGENTS.md — Frontend (React + TanStack)
 
-> **Stack**: React 19 + Vite + TypeScript + TanStack Router + TanStack Form + TanStack Query + Zustand + shadcn/ui + TailwindCSS v4
+> **Stack**: React 19 + Vite + TypeScript + TanStack Router + TanStack Form v1 + TanStack Query v5 + Zustand + shadcn/ui + TailwindCSS v4
 > **Per Hermes:** Segui queste regole per ogni modifica al frontend. Committa dopo ogni cambiamento significativo.
 
 ## 📐 Struttura del Frontend
@@ -8,437 +8,458 @@
 ```
 apps/frontend/
 ├── package.json
-├── vite.config.ts          # Vite + React plugin + TailwindCSS v4 plugin
+├── vite.config.ts          # Vite + React plugin + TanStack Router plugin + TailwindCSS v4
 ├── tsconfig.json
 ├── postcss.config.js
 ├── tailwind.config.js
 └── src/
-    ├── main.tsx            # Entry point — istanzia router, QueryClient, providers
+    ├── main.tsx            # Entry point — QueryClientProvider, RouterProvider, providers
     ├── index.css           # Tailwind directives + CSS variables (se necessarie)
+    ├── routeTree.gen.ts    # Auto-generato da @tanstack/router-plugin
     ├── routes/             # File-based routing con TanStack Router
-    │   ├── __root.tsx      # Layout root — Header, Footer, Outlet
+    │   ├── __root.tsx      # Layout root — QueryClientProvider context, Header, Outlet
     │   ├── index.tsx       # Home page (/)
     │   ├── login.tsx       # Login page (/login)
     │   ├── register.tsx    # Register page (/register)
     │   ├── dashboard.tsx   # Dashboard protetta (/dashboard)
+    │   ├── settings.tsx    # Settings protetta (/settings)
+    │   ├── $slug.tsx       # Profilo pubblico per slug (/:slug, level root)
     │   └── public.tsx      # Pagina pubblica (/public)
-    ├── components/
-    │   ├── ui/             # shadcn/ui components (button, card, input, alert, label)
-    │   └── layout/         # Componenti layout (Header.tsx, Footer.tsx)
-    ├── apis/               # Metodi asincroni per ogni risorsa (users.ts, auth.ts, ecc.)
-    ├── hooks/              # Custom hooks (useQueryOptions, useSuspenseQuery, form, utility)
-    ├── libs/               # Utility e librerie (api.ts, utils.ts, query-keys.ts)
-    └── stores/             # Zustand stores (auth.ts)
+    ├── apis/               # Funzioni async per ogni risorsa
+    │   ├── auth.ts         # /api/auth/*
+    │   └── profile.ts      # /api/profile/*
+    ├── hooks/              # Custom hooks: useQueryOptions factories + hooks
+    │   ├── useDashboardData.ts
+    │   └── useProfileData.ts
+    ├── libs/               # Utility, API client, query keys, utils
+    │   ├── api.ts          # API client con auto-refresh token
+    │   ├── query-keys.ts   # Query key factories centralizzate
+    │   └── utils.ts        # cn() per class merge
+    ├── stores/             # Zustand stores (auth)
+    │   └── auth.ts
+    └── components/
+        ├── ui/             # shadcn/ui (button, card, input, alert, label)
+        ├── layout/         # Header, Footer
+        └── FieldError.tsx  # Display errori Zod unificato
 ```
 
 **Regola: metodi asincroni in `/apis`**
-Tutti i metodi asincroni usati da `useQueryOptions` devono andare nella cartella `/apis` con nomi coerenti alla struttura dell'URL dell'endpoint:
-- `/users` → `apis/users.ts`
-- `/users/<id>` → `apis/users.ts` (funzione `getUserById`)
-- `/profile` → `apis/profile.ts`
-- `/auth` → `apis/auth.ts`
+Tutte le chiamate API vanno in `/apis` con nomi coerenti all'endpoint:
+- `/auth/login` → `apis/auth.ts` → `login(email, password)`
+- `/profile/me` → `apis/profile.ts` → `getOwnProfile()`, `updateOwnProfile()`
+- `/profile/:slug` → `apis/profile.ts` → `getPublicProfile(slug)`
 - Ogni file esporta solo funzioni async, zero business logic
 
-**Regole fondamentali:**
-1. **Mai business logic nei componenti** — separare sempre in `hooks/` o `libs/`
-2. **Mai usare TanStack Query direttamente nel componente** — creare sempre un hook dedicato (`useDashboardData`, `useUserData`)
-3. **Preferire `useSuspenseQuery` a `useQuery`** — usare il Suspense di React ove possibile
-4. **Non usare CSS vanilla** — solo TailwindCSS
-
 ---
 
-## 📦 Pacchetti NPM — Sempre all'ultima versione
+## 🗺️ TanStack Router v1
 
-**Regola:** Quando installi un pacchetto, usa SEMPRE l'ultima versione. `npm view react version` → usa `^<version>`.
+### File-Based Routing
 
-**Esempio:** `react` latest 19.2.6 → `"react": "^19.2.6"` in `package.json`.
+Il Vite plugin `@tanstack/router-plugin` genera `routeTree.gen.ts` automaticamente.
 
----
+**Naming conventions:**
+| Pattern | Tipo | Esempio |
+|---|---|---|
+| `__root.tsx` | Root layout | Wrap di tutto l'app |
+| `index.tsx` | Index | `/` |
+| `$slug.tsx` | Dynamic param | `/:slug` |
+| `dashboard.tsx` | Static route | `/dashboard` |
+| `settings.tsx` | Static route | `/settings` |
+| `_auth.tsx` | Pathless layout | N/A (groups routes) |
 
-## 🧑‍💻 Naming e Stile
+**Pathless layouts (prefix `_`):** usati per layout senza segmento URL. Es: `_auth.tsx` con `beforeLoad` per auth guard condiviso.
 
-- **Variabili e funzioni**: `camelCase`
-- **Componenti React**: `PascalCase` (es. `LoginPage`, `DashboardCard`)
-- **Custom hooks**: `use` + `PascalCase` (es. `useAuth`, `useDashboardData`)
-- **Constants**: `UPPER_SNAKE_CASE`
-- **File componenti**: `PascalCase.tsx`
-- **File hooks/lib**: `camelCase.ts`
-- **Cartelle**: `kebab-case` (`auth-routes`, `form-helpers`, `db-migrations`)
+### Route Factory Pattern
 
----
+Ogni route file deve usare `createFileRoute`:
 
-## 🗺️ File-Based Routing (TanStack Router v1)
+```tsx
+// routes/dashboard.tsx
+import { createFileRoute } from '@tanstack/react-router';
+import { useAuthStore } from '@/stores/auth';
 
-**Configurazione:** Router Vite plugin installato (`@tanstack/router-plugin`)
-
-**Struttura file → route:**
-```
-src/routes/
-  __root.tsx    → Root layout con <Outlet />
-  index.tsx     → /
-  login.tsx     → /login
-  register.tsx  → /register
-  dashboard.tsx → /dashboard (protetta)
-  public.tsx    → /public
-  _error.tsx    → (opzionale) Error boundary
-  _offline.tsx  → (opzionale) Offline page
-```
-
-**`__root.tsx` — Layout globale:**
-```typescript
-// Root layout con QueryClientProvider + Outlet
-const rootRoute = createRootRouteWithContext<{ queryClient: QueryClient }>()({
-  component: RootComponent,
-  notFoundComponent: NotFound,
-});
-
-function RootComponent() {
-  return (
-    <div className="layout">
-      <Header />
-      <main><Outlet /></main>
-      <Footer />
-    </div>
-  );
+function requireAuth() {
+  // ✅ USE Imperative getState() — beforeLoad runs OUTSIDE React
+  const { accessToken } = useAuthStore.getState();
+  if (!accessToken) {
+    window.location.href = '/login';
+    throw new Error('UNAUTHENTICATED');
+  }
 }
-```
 
-**Route protette con `beforeLoad`:**
-```typescript
-const dashboardRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/dashboard',
-  beforeLoad: () => {
-    requireAuth(); // Controlla token, reindirizza a /login se non autenticato
-  },
+export const Route = createFileRoute('/dashboard')({
+  beforeLoad: requireAuth,
   component: DashboardPage,
 });
 ```
 
----
+**⚠️ CRITICO: `beforeLoad` gira FUORI da React.**
+- ❌ MAI chiamare React hooks (`useAuthStore()`) in `beforeLoad` → "Invalid hook call"
+- ✅ SEMPRE usare la forma imperativa (`useAuthStore.getState()`)
+- ✅ Oppure creare un custom hook wrapper separato che chiama l'hook (ma non direttamente in `beforeLoad`)
 
-## 📝 Form con TanStack Form
+### Route Loaders & Data Fetching
 
-**Pattern consigliato:** `useAppForm` con composizione di form (form-composition pattern).
+I route loaders integrano direttamente TanStack Query:
 
-**Validazione:** Usare schemi Zod dal shared package a livello di form.
+```tsx
+import { createFileRoute } from '@tanstack/react-router';
+import { queryOptions } from '@tanstack/react-query';
 
-```typescript
-// Esempio: form di login
-import { useForm } from '@tanstack/react-form';
-import { loginSchema } from '@mono/shared';
+const todoQueryOptions = (id: string) =>
+  queryOptions({
+    queryKey: ['todo', id] as const,
+    queryFn: () => fetchTodo(id),
+  });
 
-const form = useForm({
-  defaultValues: { email: '', password: '' },
-  onSubmit: async ({ value }) => {
-    // Validazione Zod a livello di form
-    const result = loginSchema.safeParse(value);
-    if (!result.success) {
-      setError(result.error.errors.map(e => e.message).join(', '));
-      return;
-    }
-    // ... invio API
+export const Route = createFileRoute('/todos/$todoId')({
+  loader: ({ context: { queryClient }, params: { todoId } }) =>
+    queryClient.ensureQueryData(todoQueryOptions(todoId)),
+  component: TodoPage,
+});
+
+function TodoPage() {
+  const { todoId } = Route.useParams();
+  const { data } = useQuery(todoQueryOptions(todoId));
+  // data è typing corretto grazie a queryOptions
+}
+```
+
+### Search Params Validation
+
+```tsx
+import { z } from 'zod';
+
+const searchSchema = z.object({
+  page: z.coerce.number().default(1),
+  filter: z.string().default(''),
+});
+
+export const Route = createFileRoute('/posts')({
+  validateSearch: searchSchema.parse,
+  loaderDeps: ({ search }) => ({ page: search.page }),
+  loader: async ({ deps: { page } }) => {
+    return fetchPosts({ page });
   },
 });
 ```
 
-**Regole:**
-- Validazione field-level con `validators.onChange: schema.shape.fieldName`
-- Validazione cross-field con `.refine()` su uno schema combinato
-- Usare `form.Field` per ogni campo con `field.state.value`, `field.handleChange`, `field.handleBlur`
-- Errori: `field.state.meta.errors` — gestire sia stringa che oggetto {message}
+### Public Routes vs Protected Routes
+
+- **Pubbliche** (nessun `beforeLoad`): `index.tsx`, `$slug.tsx`
+- **Protette** (`beforeLoad` con auth check): `dashboard.tsx`, `settings.tsx`
+- **Root-level per pubblici**: le rotte di profilo pubblico vanno a livello root (`$slug.tsx`) non sotto `/profile/`, altrimenti collidono con l'auth guard di `/profile`
+
+### Navigation
+
+```tsx
+import { Link, useNavigate } from '@tanstack/react-router';
+
+// Declarative
+<Link to="/dashboard">Dashboard</Link>
+<Link to="/posts/$postId" params={{ postId: '123' }}>Post</Link>
+<Link to="/posts" search={{ page: 2 }}>Page 2</Link>
+<Link to="/posts" preload="intent">Preload on hover</Link>
+
+// Programmatic
+const navigate = useNavigate();
+navigate({ to: '/dashboard' });
+navigate({ search: (prev) => ({ ...prev, page: prev.page + 1 }) });
+```
+
+### Not Found Handling
+
+```tsx
+export const Route = createFileRoute('/posts/$slug')({
+  loader: async ({ params }) => {
+    const profile = await fetchProfile(params.slug);
+    if (!profile) throw notFound();
+    return { profile };
+  },
+  notFoundComponent: () => <div>Utente non trovato</div>,
+});
+```
 
 ---
 
-## 🔄 Query con TanStack Query
+## 📝 TanStack Form v1
 
-**Regola: MAI usare Query direttamente nel componente.**
+### Core Pattern
 
-### Pattern `useQueryOptions`
+```tsx
+import { useForm } from '@tanstack/react-form';
+import { updateProfileSchema } from '@mono/shared';
 
-Ogni query deve usare un function `useQueryOptions` che restituisce le opzioni, per massimizzare la riusabilità e centralizzare invalidation keys, staleTime, refetchOnWindowFocus, ecc.
+function SettingsPage() {
+  const form = useForm({
+    defaultValues: {
+      nickname: '',
+      gender: '',
+      birthDate: '',
+      avatar: '',
+    },
+    onSubmit: async ({ value }) => {
+      // Validazione Zod a livello di form (solo al submit)
+      const parsed = updateProfileSchema.safeParse({
+        nickname: value.nickname || undefined,
+        gender: value.gender || undefined,
+        birthDate: value.birthDate || undefined,
+        avatar: value.avatar || undefined,
+      });
 
-```typescript
-// lib/query-keys.ts — INVALIDATION KEYS CENTRALIZZATE
-export const queryKeys = {
-  dashboard: ['dashboard'] as const,
-  user: ['user'] as const,
-  userSettings: ['user', 'settings'] as const,
-  // ... ogni entità ha la propria key
-};
+      if (!parsed.success) {
+        setFormError(parsed.error.issues.map(e => e.message).join(', '));
+        return;
+      }
 
-// hooks/useDashboardData.ts — useQueryOptions pattern
-import { useSuspenseQuery, type QueryOptions } from '@tanstack/react-query';
-import { queryKeys } from '@/lib/query-keys';
-import { api } from '@/lib/api';
+      // ... submit API
+    },
+  });
 
-// Factory function per le opzioni — riusabile ovunque
-export function useDashboardQueryOptions(): QueryOptions<DashboardResponse> {
-  return {
-    queryKey: queryKeys.dashboard,
-    queryFn: () => api.get<DashboardResponse>('/protected/dashboard'),
-    staleTime: 1000 * 60,       // 1 minuto
-    refetchOnWindowFocus: false, // solo invalidate manuale
-  };
-}
-
-// Hook dedicato — usa sempre useQueryOptions
-export function useDashboardData() {
-  return useSuspenseQuery(useDashboardQueryOptions());
-}
-
-// Stesso hook con useQuery (opzionale):
-export function useDashboardDataOptional() {
-  return useQuery(useDashboardQueryOptions());
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        form.handleSubmit();
+      }}
+    >
+      <form.Field
+        name="nickname"
+        children={(field) => (
+          <input
+            value={field.state.value}
+            onChange={(e) => field.handleChange(e.target.value)}
+            onBlur={field.handleBlur}
+          />
+        )}
+      />
+      {/* Errori: */}
+      {field.state.meta.errors.length > 0 && (
+        <span>{field.state.meta.errors[0]?.message}</span>
+      )}
+      <button type="submit">Submit</button>
+    </form>
+  );
 }
 ```
 
-### Suspense + Optimistic Updates
+### Form Instance Caching (Anti-Re-Render Bug)
 
-**Minimizzare isLoading: usare Suspense per dati obbligatori.**
+Quando un componente si re-renderizza, `useForm` ricrea il form resettando i valori. **Usa `useRef` per cache:**
 
-```typescript
-// Root con Suspense
-import { Suspense } from 'react';
+```tsx
+const formRef = useRef<ReturnType<typeof useForm> | null>(null);
 
-<Suspense fallback={<Loader2 className="animate-spin" />}>
-  <Dashboard />
-</Suspense>
+const getForm = useCallback(() => {
+  if (!formRef.current) {
+    formRef.current = useForm({...});
+  }
+  return formRef.current;
+}, []);
+```
 
-// Nell'hook — nessun loading state esplicito
-export function useDashboardData() {
-  const queryClient = useQueryClient();
+### Form Field Pattern con validazione
 
-  return useSuspenseQuery({
-    ...useDashboardQueryOptions(),
-    // Optimistic update: modificare il cache direttamente
-    // se serve aggiornare dopo un'azione
+```tsx
+<form.Field
+  name="email"
+  validators={{
+    onChange: (value) => {
+      if (!value.includes('@')) return 'Email non valida';
+      return '';
+    },
+  }}
+  children={(field) => (
+    <input
+      value={field.state.value}
+      onChange={(e) => field.handleChange(e.target.value)}
+    />
+  )}
+/>
+```
+
+### Linked/Dependent Fields
+
+```tsx
+const form = useForm({...});
+
+onChange={(e) => {
+  field.handleChange(e.target.value);
+  // Sync dipendente field
+  form.setFieldValue('slug', generateSlug(e.target.value));
+}}
+```
+
+**⚠️ Pitfall: Zod `.refine()` in `onChange` validators**
+- Zod v3+ restituisce `.issues` non `.errors`
+- Validazioni complesse con `.refine()` o `.transform()` possono fallire su input parziale
+- **Usare validazione solo al submit** oppure validazione field-level semplice
+
+---
+
+## 🔄 TanStack Query v5
+
+### Query Options Pattern (Recommended)
+
+```tsx
+// libs/query-keys.ts
+export const queryKeys = {
+  dashboard: ['dashboard'] as const,
+  profile: ['profile'] as const,
+  publicProfile: (slug: string) => ['profile', 'public', slug] as const,
+  ownProfile: ['profile', 'own'] as const,
+};
+
+// hooks/useDashboardData.ts
+import { queryOptions } from '@tanstack/react-query';
+import { queryKeys } from '@/libs/query-keys';
+import { api } from '@/libs/api';
+
+export function useDashboardQueryOptions() {
+  return queryOptions({
+    queryKey: queryKeys.dashboard,
+    queryFn: () => api.get('/protected/dashboard'),
+    staleTime: 1000 * 60, // 1 minuto
+    gcTime: 1000 * 60 * 5,
+    retry: 3,
   });
 }
 
-// Pattern per invalidate dopo mutation
+// Hook wrapper — scelga tra useQuery e useSuspenseQuery
+export function useDashboardData() {
+  return useSuspenseQuery(useDashboardQueryOptions());
+}
+```
+
+### `useQuery` vs `useSuspenseQuery`
+
+| Quando usare | Hook | Perché |
+|---|---|---|
+| Dati obbligatori + Suspense boundary | `useSuspenseQuery` | Componente più pulito, data è guaranteed |
+| Dati opzionali / "not found" messages | `useQuery` | `useSuspenseQuery` crasha senza popolare `error` |
+| Liste con pagination | `useQuery` | Serve controllare `isLoading` per loading state |
+| Route loader + React Query integration | Entrambi | Loader usa `ensureQueryData`, componente usa hook |
+
+**⚠️ CRITICO: Non usare `useSuspenseQuery` per rotte che possono "not found"**
+Se una pagina deve mostrare "Utente non trovato" (profilo pubblico), usa `useQuery`. `useSuspenseQuery` lancia un errore che il Suspense boundary cattura, ma il campo `error` non è accessibile nel componente.
+
+### Mutations con Optimistic Updates
+
+```tsx
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+
 export function useUpdateProfileMutation() {
+  const queryClient = useQueryClient();
+
   return useMutation({
     mutationFn: (data: UpdateProfileInput) =>
       api.put('/protected/profile', data),
+
     onMutate: async (variables) => {
-      // 1. Pre-suspend — interrompe il refetch corrente
-      await queryClient.cancelQueries({ queryKey: queryKeys.user });
+      // 1. Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: queryKeys.ownProfile });
 
-      // 2. Snapshot del valore corrente
-      const previous = queryClient.getQueryData(queryKeys.user);
+      // 2. Snapshot previous value
+      const previous = queryClient.getQueryData(queryKeys.ownProfile);
 
-      // 3. Aggiornamento optimistic
-      queryClient.setQueryData(queryKeys.user, (old) => ({
+      // 3. Optimistic update
+      queryClient.setQueryData(queryKeys.ownProfile, (old) => ({
         ...old,
         ...variables,
       }));
 
-      // 4. Restituisce contesto per rollback
+      // 4. Return context for rollback
       return { previous };
     },
-    onError: (_err, _vars, context) => {
-      // Rollback se la mutation fallisce
-      queryClient.setQueryData(queryKeys.user, context?.previous);
+
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.ownProfile });
     },
+
+    onError: (_err, _vars, context) => {
+      // Rollback
+      queryClient.setQueryData(queryKeys.ownProfile, context?.previous);
+    },
+
     onSettled: () => {
-      // Invalida per sincronizzare
-      queryClient.invalidateQueries({ queryKey: queryKeys.user });
+      queryClient.invalidateQueries({ queryKey: queryKeys.ownProfile });
     },
   });
 }
 ```
 
-**Regole:**
-- Usare `useSuspenseQuery` quando i dati sono obbligatori per il componente — il componente non gestisce loading/error separatamente, il Suspense boundaries gestisce
-- Usare `useQuery` quando i dati sono opzionali
-- Ogni query deve avere un `useQueryOptions` factory function
-- Le invalidation keys sono centralizzate in `lib/query-keys.ts`
-- Le query keys sono `as const` per tipizzazione stretta
-- `onMutate` per optimistic update quando si modifica un dato
-- `onError` per rollback se l'API fallisce
-- `onSettled` per invalidate e sincronizzare
-- `staleTime` default: 1 minuto per dati di profilo, 5 minuti per dati statici
+### Best Practices
 
-### Struttura API Layer
+1. **Usare `queryOptions` helper** per config type-safe e riutilizzabile
+2. **Strutturare query keys gerarchicamente** per invalidation granulare
+3. **`staleTime`**: 0 = sempre refetch (default), aumenta per dati poco dinamici
+4. **`placeholderData`** (non `initialData`) per keep previous data during pagination
+5. **`enabled`** per query dipendenti, NON chiamate conditional
+6. **Sempre invalidate dopo mutation** — non affidarsi solo a optimistic updates
+7. **Cancel queries in `onMutate`** prima di optimistic updates (race conditions)
+8. **`ensureQueryData`** in route loaders invece di `prefetchQuery`
+9. **Non destrutturare il result** se va passato altrove (rompe reattività)
+10. **Usare `select`** per derived data invece di trasformare nel componente
 
-I metodi asincroni usati da `useQueryOptions` vanno separati in file nella cartella `/apis` con nomi coerenti alla struttura dell'URL dell'endpoint.
+### Query Invalidation
 
+```tsx
+queryClient.invalidateQueries({ queryKey: ['profile'] });              // Prefix
+queryClient.invalidateQueries({ queryKey: ['profile', 1], exact: true }); // Exact
+queryClient.refetchQueries({ queryKey: ['profile'] });                 // + refetch
+queryClient.removeQueries({ queryKey: ['profile', 1] });               // Remove
 ```
-src/
-├── apis/           # Metodi asincroni per ogni risorsa
-│   ├── users.ts    # /users/*, /protected/dashboard
-│   ├── profile.ts  # /protected/profile/*
-│   ├── auth.ts     # /api/auth/*
-│   └── index.ts    # Rexport di tutte le API
-├── hooks/          # useQueryOptions factory functions + hooks
-│   ├── useDashboardData.ts
-│   ├── useUserData.ts
-│   └── useProfile.ts
-    └── lib/
-        └── query-keys.ts
-```
-
-**Regole API layer:**
-- Ogni file corrisponde a una risorsa (users.ts, profile.ts, auth.ts)
-- Nome del file = segmento principale dell'URL (es. `/users` → `users.ts`)
-- Funzioni separate per ogni operation: `getUsers`, `createUser`, `updateUser`
-- Funzioni esportano solo logiche async — zero business logic
-- Mai usare `fetch` direttamente nei componenti o negli hook
 
 ---
 
-## 🛠️ State Management con Zustand
+## 🛠️ Zustand
 
-```typescript
+```tsx
 // stores/auth.ts
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
 interface AuthState {
   accessToken: string | null;
-  refreshToken: string | null;
   user: User | null;
   setAuth: (data: AuthData) => void;
   logout: () => void;
-  isAuthenticated: boolean;
 }
 
 export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
-      // ... state e actions
+      accessToken: null,
+      user: null,
+      setAuth: (data) => set({ accessToken: data.token, user: data.user }),
+      logout: () => set({ accessToken: null, user: null }),
     }),
     { name: 'auth-storage' }
   )
 );
 ```
 
-**Regole:**
-- Solo auth e stato UI globale in Zustand
-- Per stato locale del componente: `useState`
-- Per stato sincronizzato con server: TanStack Query
-- Persistenza: solo per dati che devono sopravvivere al refresh (auth)
-
----
-
-## 🎨 UI con shadcn/ui + TailwindCSS v4
-
-**Componenti disponibili:**
-- `Button` — varianti: default, destructive, outline, secondary, ghost, link
-- `Card` — Card + CardHeader + CardContent + CardTitle + CardDescription
-- `Input` — con icone absolute positioning per campi iconizzati
-- `Label` — per etichette form
-- `Alert` — varianti: default, destructive, success
-
-**TailwindCSS v4:**
-- Usare `@tailwindcss/vite` come plugin
-- Nessuna configurazione `tailwind.config.js` necessaria (v4 usa CSS-first)
-- Variabili CSS per tema: `--background`, `--foreground`, `--primary`, ecc.
-- Token tailwind: `bg-primary`, `text-muted-foreground`, `border-border`
-
-**Regole CSS:**
-- **MAI scrivere CSS custom** — solo classi Tailwind
-- Usare `cn()` da `@/lib/utils` per class merge con `clsx` + `tailwind-merge`
-- Layout: Flexbox e Grid — evitare margini negativi e hack
-- Responsive: sm/md/lg breakpoints
-
----
-
-## 📡 API Client
-
-```typescript
-// lib/api.ts
-const API_BASE = import.meta.env.VITE_API_URL || '/api';
-
-async function request<T>(url: string, options?: RequestInit): Promise<T> {
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  // Merge headers sicuro (mai spread di options.headers)
-  // ...
-  const response = await fetch(`${API_BASE}${url}`, { ...options, headers });
-  
-  // Auto token refresh su 401
-  if (response.status === 401) {
-    const refreshToken = useAuthStore.getState().refreshToken;
-    if (refreshToken) {
-      // ... tentare refresh
-    }
-  }
-  // ...
-}
-
-export const api = {
-  get: <T>(url: string) => request<T>(url, { method: 'GET' }),
-  post: <T>(url: string, body?: unknown) => request<T>(url, { method: 'POST', body: JSON.stringify(body) }),
-  put: <T>(url: string, body?: unknown) => request<T>(url, { method: 'PUT', body: JSON.stringify(body) }),
-};
-```
-
-**Regole:**
-- Header: merge manuale, MAI spread di `options.headers` (causa type error)
-- Auto-refresh token su 401
-- Errori: eravamo sempre `{ success: false, error: string }` dal backend
-- Type safety: `api.get<Type>()` — MAI usare senza generic
-
----
-
-## 🧪 Test con Bun
-
-```typescript
-// apps/backend/src/routes/__tests__/auth.test.ts
-import { describe, it, expect } from 'bun:test';
-import { hashPassword, verifyPassword } from '../auth';
-
-describe('Password Hashing', () => {
-  it('hashes a password correctly', async () => {
-    const hash = await hashPassword('password123');
-    expect(hash).toContain(':');
-    expect(hash.split(':')).toHaveLength(2);
-  });
-  
-  it('verifies correct password', async () => {
-    const hash = await hashPassword('password123');
-    const valid = await verifyPassword('password123', hash);
-    expect(valid).toBe(true);
-  });
-  
-  it('rejects wrong password', async () => {
-    const hash = await hashPassword('password123');
-    const valid = await verifyPassword('wrongpassword', hash);
-    expect(valid).toBe(false);
-  });
-});
-```
-
-**Regole:**
-- `bun test` — zero config, nativo
-- Test per ogni funzione di business logic
-- Test per validazione schemi Zod
-- Test per hash/verify password
-- Coprire casi di successo e errore
-- Nomi test descrittivi: `describe('X', () => it('does Y when Z', ...))`
+**⚠️ In `beforeLoad` di TanStack Router:**
+- ❌ `useAuthStore()` (hook) → "Invalid hook call"
+- ✅ `useAuthStore.getState()` (imperativo) → funziona fuori da React
 
 ---
 
 ## ✅ Checklist Modifica Frontend
 
-- [ ] La logica è separata dal componente (hook o utility)?
-- [ ] I dati sono fetchati da un hook dedicato (non direttamente nel componente)?
-- [ ] Si usa `useSuspenseQuery` dove appropriato?
-- [ ] La validazione usa schemi Zod dal shared package?
-- [ ] Sono presenti commenti su tutte le funzioni pubbliche?
-- [ ] Il nome del file segue `PascalCase.tsx` (componente) o `camelCase.ts` (hook/lib)?
-- [ ] Il commit è descrittivo (Conventional Commits)?
-- [ ] È presente un test per la logica business?
-- [ ] Sono usati solo componenti shadcn/ui e classi Tailwind (zero CSS custom)?
-
----
-
-## 📚 Risorse
-
-- TanStack Router: https://tanstack.com/router/latest/docs/framework/react/overview
-- TanStack Form: https://tanstack.com/form/latest/docs/framework/react/overview
-- TanStack Query: https://tanstack.com/query/latest/docs/react/overview
-- Zustand: https://zustand.docs.pmnd.rs/
-- shadcn/ui: https://ui.shadcn.com/
-- TailwindCSS v4: https://tailwindcss.com/docs/v4-beta
+- [ ] Router: `beforeLoad` usa solo imperative store access (`getState()`), mai hooks
+- [ ] Router: rotte pubbliche a livello root se devono evitare auth guard
+- [ ] Router: `params` e `validateSearch` tipizzati con Zod
+- [ ] Form: istanza form cache con `useRef` per evitare re-render reset
+- [ ] Form: validazione Zod al submit, non `onChange` con `.refine()` complessi
+- [ ] Form: `field.state.meta.errors` per display (non `.errors`)
+- [ ] Query: `useQuery` per rotte "not found", `useSuspenseQuery` per dati obbligatori
+- [ ] Query: query options factory con `queryOptions` helper
+- [ ] Query: query keys `as const` per tipizzazione stretta
+- [ ] Query: `onMutate` cancel + optimistic + `onError` rollback pattern
+- [ ] Query: `onSettled` sempre invalidate per sincronizzazione
+- [ ] Naming: `PascalCase.tsx` per componenti, `camelCase.ts` per hooks/libs
+- [ ] Zero CSS custom — solo Tailwind
+- [ ] Zero business logic nei componenti

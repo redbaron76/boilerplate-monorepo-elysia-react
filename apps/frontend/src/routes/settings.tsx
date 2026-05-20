@@ -23,6 +23,8 @@ function generateSlug(nickname: string): string {
 
 /**
  * Guard di autenticazione per la pagina impostazioni.
+ * CRITICO: beforeLoad gira FUORI da React → mai usare hooks (useAuthStore).
+ * Usare sempre la forma imperativa getState().
  */
 function requireAuth() {
   const { accessToken } = useAuthStore.getState();

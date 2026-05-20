@@ -1,15 +1,14 @@
-import { useSuspenseQuery, type UseSuspenseQueryOptions } from '@tanstack/react-query';
+import { useSuspenseQuery, queryOptions } from '@tanstack/react-query';
 import { queryKeys } from '@/libs/query-keys';
 import { getOwnProfile } from '@/apis/profile';
 import type { ProfileOwn } from '@/apis/profile';
 
 /**
  * Factory per le opzioni della query profilo proprio.
- * Centralizza queryKey, queryFn, staleTime e refetchOnWindowFocus.
- * @returns QueryOptions per il profilo utente corrente
+ * Usa queryOptions helper per type-safety e riusabilità.
  */
-export function useOwnProfileQueryOptions(): UseSuspenseQueryOptions<ProfileOwn> {
-  return {
+export function useOwnProfileQueryOptions() {
+  return queryOptions({
     queryKey: queryKeys.ownProfile,
     queryFn: async () => {
       const r = await getOwnProfile();
@@ -18,8 +17,10 @@ export function useOwnProfileQueryOptions(): UseSuspenseQueryOptions<ProfileOwn>
       }
       return r.data;
     },
-    staleTime: 1000 * 60 * 5,
-  };
+    staleTime: 1000 * 60 * 5,    // 5 minuti
+    gcTime: 1000 * 60 * 15,       // 15 minuti garbage collection
+    refetchOnWindowFocus: false,  // solo invalidate manuale
+  });
 }
 
 /**
@@ -28,9 +29,5 @@ export function useOwnProfileQueryOptions(): UseSuspenseQueryOptions<ProfileOwn>
  * @returns Dati del profilo
  */
 export function useOwnProfileData() {
-  const queryOptions = useOwnProfileQueryOptions();
-  return useSuspenseQuery({
-    ...queryOptions,
-    refetchOnWindowFocus: false,
-  });
+  return useSuspenseQuery(useOwnProfileQueryOptions());
 }

@@ -1,52 +1,18 @@
 /**
- * Invalidazione Query Keys — TanStack Query
- * Usato da: hooks/useDashboardData, hooks/useUserData, hooks/useUpdateProfile
- * Dove: libs/query-keys.ts
- * Esempio: queryClient.invalidateQueries({ queryKey: queryKeys.dashboard })
- */
-
-/**
- * Chiavi di invalidazione centralizzate per TanStack Query.
- * Tutte le query devono riferirsi a queste costanti per garantire
- * coerenza nell'invalidazione e nell'aggiornamento del cache.
+ * Query Key Factory — TanStack Query v5
+ * Chiavi di invalidazione centralizzate per coerenza cache.
  *
- * Pattern: arrays di stringhe come const per tipizzazione stretta.
+ * Pattern: array di stringhe come const per tipizzazione stretta.
+ * Per chiavi dinamiche: funzione che restituisce [key, ...rest] as const.
  */
 
 export const queryKeys = {
   /** Dashboard API — /protected/dashboard */
   dashboard: ['dashboard'] as const,
 
-  /** Utente corrente — /protected/user */
-  user: ['user'] as const,
-
-  /** Impostazioni utente — /protected/user/settings */
-  userSettings: ['user', 'settings'] as const,
-
-  /** Profilo utente — /protected/profile */
-  profile: ['profile'] as const,
-
-  /** Profilo pubblico per slug — /profile/:slug */
+  /** Profilo pubblico per slug — /:slug */
   publicProfile: (slug: string) => ['profile', 'public', slug] as const,
 
   /** Profilo proprio — /profile/me */
   ownProfile: ['profile', 'own'] as const,
-
-  /** Lista risorse (es. prodotti, ordini, ecc.) — da estendere */
-  resources: ['resources'] as const,
 } as const;
-
-/**
- * Helper per invalidare tutte le query di un modulo.
- * @param queryClient — istanza di QueryClient
- * @example
- *   invalidateAll(queryClient, 'dashboard');
- */
-export function invalidateAll(
-  queryClient: import('@tanstack/react-query').QueryClient,
-  prefix: string
-): void {
-  queryClient.invalidateQueries({
-    queryKey: [prefix],
-  });
-}
