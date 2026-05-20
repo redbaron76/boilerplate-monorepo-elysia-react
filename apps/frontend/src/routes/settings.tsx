@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Settings, User, Mail, Save, Camera, Trash2, ArrowLeft, CheckCircle, AlertTriangle, Sparkles } from 'lucide-react';
 import { updateProfileSchema } from '@mono/shared';
-import { queryClient } from '@/main';
+import { queryKeys } from '@/libs/query-keys';
 
 function generateSlug(nickname: string): string {
   return nickname
@@ -56,9 +56,16 @@ function SettingsPage() {
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  // ✅ Usa queryOptions helper pattern invece di hardcoded
   const { data: profile, isLoading, error } = useQuery({
-    queryKey: ['profile', 'own'],
-    queryFn: getOwnProfile,
+    queryKey: queryKeys.ownProfile,
+    queryFn: async () => {
+      const r = await getOwnProfile();
+      if (!r.success) throw new Error(r.error || 'Errore sconosciuto');
+      return r.data;
+    },
+    staleTime: 1000 * 60 * 5,
+    refetchOnWindowFocus: false,
   });
 
   // Form persistent: useRef evita re-inizializzazione a ogni render
@@ -69,6 +76,7 @@ function SettingsPage() {
       formRef.current = useForm({
         defaultValues: {
           nickname: '',
+          slug: '',
           gender: '',
           birthDate: '',
           avatar: '',
@@ -113,6 +121,7 @@ function SettingsPage() {
   const populateForm = useCallback((formData: ReturnType<typeof getForm>) => {
     if (!profile) return;
     formData.setFieldValue('nickname', profile.nickname || '');
+    formData.setFieldValue('slug', generateSlug(profile.nickname || ''));
     formData.setFieldValue('gender', profile.gender || '');
     formData.setFieldValue('birthDate', profile.birthDate ? new Date(profile.birthDate).toISOString().split('T')[0] : '');
     formData.setFieldValue('avatar', profile.avatar || '');
@@ -128,11 +137,13 @@ function SettingsPage() {
   const updateMutation = useMutation({
     mutationFn: updateOwnProfile,
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['profile', 'own'] });
+      // ✅ Usa queryKeys.ownProfile invece di hardcoded
+      queryClient.invalidateQueries({ queryKey: queryKeys.ownProfile });
       // Aggiorna il form con i nuovi dati dal server
       const formData = getForm();
       if (data?.data) {
         formData.setFieldValue('nickname', data.data.nickname || '');
+        formData.setFieldValue('slug', generateSlug(data.data.nickname || ''));
         formData.setFieldValue('gender', data.data.gender || '');
         formData.setFieldValue('birthDate', data.data.birthDate ? new Date(data.data.birthDate).toISOString().split('T')[0] : '');
         formData.setFieldValue('avatar', data.data.avatar || '');
