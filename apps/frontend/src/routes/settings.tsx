@@ -1,9 +1,8 @@
 import { createFileRoute, useNavigate, Link } from '@tanstack/react-router';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useForm } from '@tanstack/react-form';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '@/stores/auth';
-import { getOwnProfile, updateOwnProfile, type ProfileOwn, type UpdateProfilePayload } from '@/apis/profile';
+import { type UpdateProfilePayload } from '@/apis/profile';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,15 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Settings, User, Mail, Save, Camera, Trash2, ArrowLeft, CheckCircle, AlertTriangle, Sparkles } from 'lucide-react';
 import { updateProfileSchema } from '@mono/shared';
-import { queryKeys } from '@/libs/query-keys';
-
-function generateSlug(nickname: string): string {
-  return nickname
-    .toLowerCase()
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/(^-|-$)/g, '');
-}
+import { useProfileSettings, useSettingsUI } from '@/hooks/useProfileSettings';
 
 /**
  * Guard di autenticazione per la pagina impostazioni.
@@ -47,26 +38,19 @@ export const Route = createFileRoute('/settings')({
   component: SettingsPage,
 });
 
+/**
+ * Componente pagina impostazioni.
+ * Regola AGENTS: zero hook TanStack Query qui — tutti estratti in hooks/
+ */
 function SettingsPage() {
   const navigate = useNavigate();
-  const { user, logout } = useAuthStore();
-  const queryClient = useQueryClient();
+  const { user, logout } = useSettingsUI();
+  const { profile, isLoading, error, updateMutation, generateSlug } = useProfileSettings();
+
   const [formError, setFormError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [saving, setSaving] = useState(false);
-
-  // ✅ Usa queryOptions helper pattern invece di hardcoded
-  const { data: profile, isLoading, error } = useQuery({
-    queryKey: queryKeys.ownProfile,
-    queryFn: async () => {
-      const r = await getOwnProfile();
-      if (!r.success) throw new Error(r.error || 'Errore sconosciuto');
-      return r.data;
-    },
-    staleTime: 1000 * 60 * 5,
-    refetchOnWindowFocus: false,
-  });
 
   // Form persistent: useRef evita re-inizializzazione a ogni render
   const formRef = useRef<ReturnType<typeof useForm> | null>(null);
@@ -125,7 +109,7 @@ function SettingsPage() {
     formData.setFieldValue('gender', profile.gender || '');
     formData.setFieldValue('birthDate', profile.birthDate ? new Date(profile.birthDate).toISOString().split('T')[0] : '');
     formData.setFieldValue('avatar', profile.avatar || '');
-  }, [profile]);
+  }, [profile, generateSlug]);
 
   useEffect(() => {
     const formData = getForm();
@@ -133,29 +117,6 @@ function SettingsPage() {
       populateForm(formData);
     }
   }, [profile, getForm, populateForm]);
-
-  const updateMutation = useMutation({
-    mutationFn: updateOwnProfile,
-    onSuccess: (data) => {
-      // ✅ Usa queryKeys.ownProfile invece di hardcoded
-      queryClient.invalidateQueries({ queryKey: queryKeys.ownProfile });
-      // Aggiorna il form con i nuovi dati dal server
-      const formData = getForm();
-      if (data?.data) {
-        formData.setFieldValue('nickname', data.data.nickname || '');
-        formData.setFieldValue('slug', generateSlug(data.data.nickname || ''));
-        formData.setFieldValue('gender', data.data.gender || '');
-        formData.setFieldValue('birthDate', data.data.birthDate ? new Date(data.data.birthDate).toISOString().split('T')[0] : '');
-        formData.setFieldValue('avatar', data.data.avatar || '');
-      }
-      setSuccessMsg('Profilo aggiornato con successo!');
-      setFormError('');
-      setTimeout(() => setSuccessMsg(''), 3000);
-    },
-    onError: (err: any) => {
-      setFormError(err?.message || 'Errore durante l\'aggiornamento');
-    },
-  });
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -174,14 +135,11 @@ function SettingsPage() {
 
   const handleDelete = async () => {
     if (!deleteConfirm) return;
-    // TODO: implement delete account mutation
     logout();
     navigate({ to: '/' });
   };
 
-  // Calcola slug dal nickname corrente
-  const currentNickname = profile?.nickname || '';
-  const currentSlug = currentNickname ? generateSlug(currentNickname) : '';
+  const currentSlug = profile?.slug || '';
 
   if (isLoading) {
     return (
@@ -255,7 +213,6 @@ function SettingsPage() {
                       value={field.state.value}
                       onChange={(e) => {
                         field.handleChange(e.target.value as string);
-                        // Aggiorna automaticamente lo slug
                         formData.setFieldValue('slug', generateSlug(e.target.value as string));
                       }}
                     />
