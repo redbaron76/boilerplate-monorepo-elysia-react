@@ -5,10 +5,10 @@ import { Button } from '@/components/ui/button';
 import { User, Calendar, MapPin, ArrowLeft } from 'lucide-react';
 
 /**
- * Route profilo pubblico (/:nickname).
- * Mostra i dati pubblici di un utente cercati per nickname.
+ * Route profilo pubblico (/:slug).
+ * Mostra i dati pubblici di un utente cercati per slug.
  */
-export const Route = createFileRoute('/$nickname')({
+export const Route = createFileRoute('/$slug')({
   component: PublicProfilePage,
 });
 
@@ -34,8 +34,8 @@ function formatItalianMonthYear(date: Date): string {
  * Componente pagina profilo pubblico.
  */
 function PublicProfilePage() {
-  const { nickname } = Route.useParams();
-  const { data, isLoading, error } = usePublicProfileData(nickname);
+  const { slug } = Route.useParams();
+  const { data, isLoading, error } = usePublicProfileData(slug);
 
   const genderLabels: Record<string, string> = {
     MALE: 'Maschile',
@@ -58,7 +58,7 @@ function PublicProfilePage() {
         <div className="mb-6 text-6xl">👤</div>
         <h1 className="text-2xl font-bold mb-2">Utente non trovato</h1>
         <p className="text-muted-foreground mb-6">
-          L'utente @{nickname} non esiste o è stato eliminato.
+          L'utente /{slug} non esiste o è stato eliminato.
         </p>
         <Link to="/">
           <Button variant="outline">
@@ -92,6 +92,9 @@ function PublicProfilePage() {
             )}
           </div>
           <CardTitle className="text-2xl">@{data.nickname}</CardTitle>
+          <CardDescription className="text-muted-foreground/70 text-sm">
+            URL: /{data.slug}
+          </CardDescription>
           <CardDescription>
             Membro dal {formatItalianMonthYear(new Date(data.createdAt))}
           </CardDescription>

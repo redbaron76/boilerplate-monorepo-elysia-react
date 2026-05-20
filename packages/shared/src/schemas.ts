@@ -54,7 +54,7 @@ export const updateProfileBaseSchema = z.object({
     .string()
     .min(3, 'Il nickname deve avere almeno 3 caratteri')
     .max(20, 'Il nickname non può superare i 20 caratteri')
-    .regex(/^[a-zA-Z0-9_]+$/, 'Il nickname può contenere solo lettere, numeri e underscore')
+    .regex(/^[a-zA-Z0-9_\s]+$/, 'Il nickname può contenere lettere, numeri, spazi e underscore')
     .optional()
     .or(z.literal('')),
   gender: profileGenderSchema.optional().or(z.literal('')),
@@ -75,10 +75,11 @@ export const updateProfileSchema = updateProfileBaseSchema.refine(
   { message: 'Almeno un campo deve essere specificato' }
 );
 
-// --- Public Profile Response ---
+// --- Public Profile Response (con slug) ---
 export const publicProfileSchema = z.object({
   id: z.number(),
   nickname: z.string(),
+  slug: z.string(),
   gender: profileGenderSchema.nullable(),
   birthDate: z.date().nullable(),
   avatar: z.string().nullable(),

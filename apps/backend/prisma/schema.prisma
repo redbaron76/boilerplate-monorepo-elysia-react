@@ -20,7 +20,8 @@ model User {
   passwordHash  String         @map("password_hash")
   refreshToken  String?        @map("refresh_token")
   name          String?
-  nickname      String?        @unique
+  nickname      String?
+  slug          String?        @unique @map("slug")
   gender        ProfileGender?
   birthDate     DateTime?      @map("birth_date")
   avatar        String?

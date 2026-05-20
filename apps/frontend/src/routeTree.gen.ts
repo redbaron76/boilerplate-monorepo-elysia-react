@@ -14,7 +14,7 @@ import { Route as RegisterRouteImport } from './routes/register'
 import { Route as PublicRouteImport } from './routes/public'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as DashboardRouteImport } from './routes/dashboard'
-import { Route as NicknameRouteImport } from './routes/$nickname'
+import { Route as SlugRouteImport } from './routes/$slug'
 import { Route as IndexRouteImport } from './routes/index'
 
 const SettingsRoute = SettingsRouteImport.update({
@@ -42,9 +42,9 @@ const DashboardRoute = DashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
-const NicknameRoute = NicknameRouteImport.update({
-  id: '/$nickname',
-  path: '/$nickname',
+const SlugRoute = SlugRouteImport.update({
+  id: '/$slug',
+  path: '/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -55,7 +55,7 @@ const IndexRoute = IndexRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/$nickname': typeof NicknameRoute
+  '/$slug': typeof SlugRoute
   '/dashboard': typeof DashboardRoute
   '/login': typeof LoginRoute
   '/public': typeof PublicRoute
@@ -64,7 +64,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/$nickname': typeof NicknameRoute
+  '/$slug': typeof SlugRoute
   '/dashboard': typeof DashboardRoute
   '/login': typeof LoginRoute
   '/public': typeof PublicRoute
@@ -74,7 +74,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/$nickname': typeof NicknameRoute
+  '/$slug': typeof SlugRoute
   '/dashboard': typeof DashboardRoute
   '/login': typeof LoginRoute
   '/public': typeof PublicRoute
@@ -85,7 +85,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
-    | '/$nickname'
+    | '/$slug'
     | '/dashboard'
     | '/login'
     | '/public'
@@ -94,7 +94,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
-    | '/$nickname'
+    | '/$slug'
     | '/dashboard'
     | '/login'
     | '/public'
@@ -103,7 +103,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
-    | '/$nickname'
+    | '/$slug'
     | '/dashboard'
     | '/login'
     | '/public'
@@ -113,7 +113,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  NicknameRoute: typeof NicknameRoute
+  SlugRoute: typeof SlugRoute
   DashboardRoute: typeof DashboardRoute
   LoginRoute: typeof LoginRoute
   PublicRoute: typeof PublicRoute
@@ -158,11 +158,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/$nickname': {
-      id: '/$nickname'
-      path: '/$nickname'
-      fullPath: '/$nickname'
-      preLoaderRoute: typeof NicknameRouteImport
+    '/$slug': {
+      id: '/$slug'
+      path: '/$slug'
+      fullPath: '/$slug'
+      preLoaderRoute: typeof SlugRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -177,7 +177,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  NicknameRoute: NicknameRoute,
+  SlugRoute: SlugRoute,
   DashboardRoute: DashboardRoute,
   LoginRoute: LoginRoute,
   PublicRoute: PublicRoute,

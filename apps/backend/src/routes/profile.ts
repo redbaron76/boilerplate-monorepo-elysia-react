@@ -3,16 +3,35 @@ import { jwt } from '@elysiajs/jwt';
 import { db } from '../db';
 import { updateProfileSchema, getJwtConfig } from '@mono/shared';
 
-// --- Public Profile Routes ---
+/**
+ * Genera uno slug univoco a partire dal nickname.
+ * Esempi: "Il Guerriero" → "il-guerriero", "Mario_Rossi" → "mario-rossi"
+ */
+function generateSlug(nickname: string): string {
+  return nickname
+    .toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // rimuovi accenti
+    .replace(/[^a-z0-9]+/g, '-')                     // spazi → -
+    .replace(/(^-|-$)/g, '');                         // rimuovi - iniziale/fianale
+}
+
+/**
+ * Trova un utente che ha già questo slug (per evitare collisioni).
+ */
+async function findUserBySlug(slug: string) {
+  return db.user.findFirst({ where: { slug } });
+}
+
+// --- Public Profile Routes (cerca per slug, non nickname) ---
 export const profileRoutes = new Elysia({ prefix: '/api/profile' })
   /**
    * @swagger
-   * /api/profile/{nickname}:
+   * /api/profile/{slug}:
    *   get:
-   *     summary: Ottieni profilo pubblico di un utente per nickname
+   *     summary: Ottieni profilo pubblico di un utente per slug
    *     tags: [Profile]
    *     parameters:
-   *       - name: nickname
+   *       - name: slug
    *         in: path
    *         required: true
    *         schema:
@@ -23,20 +42,21 @@ export const profileRoutes = new Elysia({ prefix: '/api/profile' })
    *       404:
    *         description: Utente non trovato
    */
-  .get('/:nickname', async ({ params, set }) => {
-    const { nickname } = params;
+  .get('/:slug', async ({ params, set }) => {
+    const { slug } = params;
 
-    // Validate nickname format
-    if (!/^[a-zA-Z0-9_]{3,20}$/.test(nickname)) {
+    // Validazione formato slug
+    if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(slug)) {
       set.status = 400;
-      return { success: false, error: 'Nickname non valido (3-20 caratteri, solo lettere, numeri, underscore)' };
+      return { success: false, error: 'Slug non valido' };
     }
 
     const user = await db.user.findFirst({
-      where: { nickname },
+      where: { slug },
       select: {
         id: true,
         nickname: true,
+        slug: true,
         gender: true,
         birthDate: true,
         avatar: true,
@@ -54,6 +74,7 @@ export const profileRoutes = new Elysia({ prefix: '/api/profile' })
       data: {
         id: user.id,
         nickname: user.nickname!,
+        slug: user.slug!,
         gender: user.gender,
         birthDate: user.birthDate,
         avatar: user.avatar,
@@ -101,6 +122,7 @@ export const protectedProfileRoutes = new Elysia({ prefix: '/api/profile' })
       select: {
         id: true,
         nickname: true,
+        slug: true,
         gender: true,
         birthDate: true,
         avatar: true,
@@ -119,6 +141,7 @@ export const protectedProfileRoutes = new Elysia({ prefix: '/api/profile' })
       data: {
         id: dbUser.id,
         nickname: dbUser.nickname,
+        slug: dbUser.slug,
         gender: dbUser.gender,
         birthDate: dbUser.birthDate,
         avatar: dbUser.avatar,
@@ -179,19 +202,27 @@ export const protectedProfileRoutes = new Elysia({ prefix: '/api/profile' })
     const userId = Number(decoded.sub);
     const existing = await db.user.findUnique({
       where: { id: userId },
-      select: { nickname: true },
+      select: { nickname: true, slug: true },
     });
 
     const updateData: Record<string, unknown> = {};
+
     if (nickname !== undefined) {
-      // Check uniqueness if nickname changed
-      if (existing?.nickname !== nickname) {
-        const duplicate = await db.user.findFirst({ where: { nickname } });
-        if (duplicate) {
+      const newSlug = nickname ? generateSlug(nickname) : null;
+
+      // Se il nickname cambia OPPURE se lo slug è null (prima non esisteva)
+      const shouldUpdateSlug = (existing?.nickname !== nickname) || existing?.slug === null;
+
+      if (shouldUpdateSlug) {
+        // Check uniqueness: non può essere lo stesso slug di un altro utente
+        const slugExists = await findUserBySlug(newSlug);
+        if (slugExists && slugExists.id !== userId) {
           set.status = 409;
-          return { success: false, error: 'Nickname già in uso' };
+          return { success: false, error: `Slug /${newSlug} già in uso` };
         }
+
         updateData.nickname = nickname || null;
+        updateData.slug = newSlug || null;
       }
     }
     if (gender) updateData.gender = gender;
@@ -203,7 +234,7 @@ export const protectedProfileRoutes = new Elysia({ prefix: '/api/profile' })
       const dbUser = await db.user.findUnique({
         where: { id: userId },
         select: {
-          id: true, nickname: true, gender: true, birthDate: true, avatar: true,
+          id: true, nickname: true, slug: true, gender: true, birthDate: true, avatar: true,
           createdAt: true, updatedAt: true,
         },
       });
@@ -215,7 +246,7 @@ export const protectedProfileRoutes = new Elysia({ prefix: '/api/profile' })
       where: { id: userId },
       data: updateData,
       select: {
-        id: true, nickname: true, gender: true, birthDate: true, avatar: true,
+        id: true, nickname: true, slug: true, gender: true, birthDate: true, avatar: true,
         createdAt: true, updatedAt: true,
       },
     });

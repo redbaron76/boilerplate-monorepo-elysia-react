@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate, Link } from '@tanstack/react-router';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useForm } from '@tanstack/react-form';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '@/stores/auth';
@@ -9,9 +9,17 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Settings, User, Mail, Save, Camera, Trash2, ArrowLeft, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Settings, User, Mail, Save, Camera, Trash2, ArrowLeft, CheckCircle, AlertTriangle, Sparkles } from 'lucide-react';
 import { updateProfileSchema } from '@mono/shared';
 import { queryClient } from '@/main';
+
+function generateSlug(nickname: string): string {
+  return nickname
+    .toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '');
+}
 
 /**
  * Guard di autenticazione per la pagina impostazioni.
@@ -51,10 +59,82 @@ function SettingsPage() {
     queryFn: getOwnProfile,
   });
 
+  // Form persistent: useRef evita re-inizializzazione a ogni render
+  const formRef = useRef<ReturnType<typeof useForm> | null>(null);
+
+  const getForm = useCallback(() => {
+    if (!formRef.current) {
+      formRef.current = useForm({
+        defaultValues: {
+          nickname: '',
+          gender: '',
+          birthDate: '',
+          avatar: '',
+        },
+        onSubmit: async ({ value }) => {
+          setFormError('');
+          setSuccessMsg('');
+
+          const parsed = updateProfileSchema.safeParse({
+            nickname: value.nickname || undefined,
+            gender: value.gender || undefined,
+            birthDate: value.birthDate || undefined,
+            avatar: value.avatar || undefined,
+          });
+
+          if (!parsed.success) {
+            setFormError(parsed.error.issues.map(e => e.message).join(', '));
+            return;
+          }
+
+          const cleaned: UpdateProfilePayload = {};
+          if (value.nickname) cleaned.nickname = value.nickname;
+          if (value.gender && value.gender !== '') cleaned.gender = value.gender as UpdateProfilePayload['gender'];
+          if (value.birthDate && value.birthDate !== '') cleaned.birthDate = value.birthDate;
+          if (value.avatar && value.avatar !== '') cleaned.avatar = value.avatar;
+
+          if (Object.keys(cleaned).length === 0) {
+            setFormError('Nessun campo da aggiornare');
+            return;
+          }
+
+          setSaving(true);
+          await updateMutation.mutateAsync(cleaned);
+          setSaving(false);
+        },
+      });
+    }
+    return formRef.current;
+  }, []);
+
+  // Popola il form quando il profilo è caricato
+  const populateForm = useCallback((formData: ReturnType<typeof getForm>) => {
+    if (!profile) return;
+    formData.setFieldValue('nickname', profile.nickname || '');
+    formData.setFieldValue('gender', profile.gender || '');
+    formData.setFieldValue('birthDate', profile.birthDate ? new Date(profile.birthDate).toISOString().split('T')[0] : '');
+    formData.setFieldValue('avatar', profile.avatar || '');
+  }, [profile]);
+
+  useEffect(() => {
+    const formData = getForm();
+    if (profile) {
+      populateForm(formData);
+    }
+  }, [profile, getForm, populateForm]);
+
   const updateMutation = useMutation({
     mutationFn: updateOwnProfile,
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['profile', 'own'] });
+      // Aggiorna il form con i nuovi dati dal server
+      const formData = getForm();
+      if (data?.data) {
+        formData.setFieldValue('nickname', data.data.nickname || '');
+        formData.setFieldValue('gender', data.data.gender || '');
+        formData.setFieldValue('birthDate', data.data.birthDate ? new Date(data.data.birthDate).toISOString().split('T')[0] : '');
+        formData.setFieldValue('avatar', data.data.avatar || '');
+      }
       setSuccessMsg('Profilo aggiornato con successo!');
       setFormError('');
       setTimeout(() => setSuccessMsg(''), 3000);
@@ -64,55 +144,6 @@ function SettingsPage() {
     },
   });
 
-  const form = useForm({
-    defaultValues: {
-      nickname: '',
-      gender: '',
-      birthDate: '',
-      avatar: '',
-    },
-    onSubmit: async ({ value }) => {
-      setFormError('');
-      setSuccessMsg('');
-
-      const parsed = updateProfileSchema.safeParse({
-        nickname: value.nickname || undefined,
-        gender: value.gender || undefined,
-        birthDate: value.birthDate || undefined,
-        avatar: value.avatar || undefined,
-      });
-
-      if (!parsed.success) {
-        setFormError(parsed.error.issues.map(e => e.message).join(', '));
-        return;
-      }
-
-      const cleaned: UpdateProfilePayload = {};
-      if (value.nickname) cleaned.nickname = value.nickname;
-      if (value.gender && value.gender !== '') cleaned.gender = value.gender as UpdateProfilePayload['gender'];
-      if (value.birthDate && value.birthDate !== '') cleaned.birthDate = value.birthDate;
-      if (value.avatar && value.avatar !== '') cleaned.avatar = value.avatar;
-
-      if (Object.keys(cleaned).length === 0) {
-        setFormError('Nessun campo da aggiornare');
-        return;
-      }
-
-      setSaving(true);
-      await updateMutation.mutateAsync(cleaned);
-      setSaving(false);
-    },
-  });
-
-  useEffect(() => {
-    if (profile) {
-      form.setFieldValue('nickname', profile.nickname || '');
-      form.setFieldValue('gender', profile.gender || '');
-      form.setFieldValue('birthDate', profile.birthDate ? new Date(profile.birthDate).toISOString().split('T')[0] : '');
-      form.setFieldValue('avatar', profile.avatar || '');
-    }
-  }, [profile, form]);
-
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -121,7 +152,10 @@ function SettingsPage() {
       return;
     }
     const reader = new FileReader();
-    reader.onloadend = () => form.setFieldValue('avatar', reader.result as string);
+    reader.onloadend = () => {
+      const formData = getForm();
+      formData.setFieldValue('avatar', reader.result as string);
+    };
     reader.readAsDataURL(file);
   };
 
@@ -132,6 +166,10 @@ function SettingsPage() {
     navigate({ to: '/' });
   };
 
+  // Calcola slug dal nickname corrente
+  const currentNickname = profile?.nickname || '';
+  const currentSlug = currentNickname ? generateSlug(currentNickname) : '';
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -139,6 +177,8 @@ function SettingsPage() {
       </div>
     );
   }
+
+  const formData = getForm();
 
   return (
     <div className="container mx-auto max-w-3xl px-4 py-10">
@@ -175,7 +215,7 @@ function SettingsPage() {
           </CardHeader>
           <CardContent>
             <form
-              onSubmit={(e) => { e.preventDefault(); e.stopPropagation(); form.handleSubmit(); }}
+              onSubmit={(e) => { e.preventDefault(); e.stopPropagation(); formData.handleSubmit(); }}
               className="space-y-4"
             >
               {formError && (
@@ -200,10 +240,35 @@ function SettingsPage() {
                       name={field.name}
                       placeholder="Il tuo nickname pubblico (3-20 caratteri)"
                       value={field.state.value}
-                      onChange={(e) => field.handleChange(e.target.value as string)}
+                      onChange={(e) => {
+                        field.handleChange(e.target.value as string);
+                        // Aggiorna automaticamente lo slug
+                        formData.setFieldValue('slug', generateSlug(e.target.value as string));
+                      }}
                     />
                     <p className="text-xs text-muted-foreground">
                       Usato per il profilo pubblico: /{field.state.value || 'nickname'}
+                    </p>
+                  </div>
+                )}
+              </form.Field>
+
+              <form.Field name="slug">
+                {(field) => (
+                  <div className="space-y-2">
+                    <Label htmlFor={field.name}>
+                      Slug URL
+                      <span className="ml-2 text-xs text-muted-foreground">(auto-generato)</span>
+                    </Label>
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1 px-3 py-2 rounded-lg border border-border bg-muted/50 text-muted-foreground text-sm flex-1">
+                        <span className="text-muted-foreground/70">/</span>
+                        <span>{field.state.value || 'slug'}</span>
+                      </div>
+                      <Sparkles className="text-purple-400" size={14} />
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      URL del profilo pubblico: <code className="bg-muted px-1 py-0.5 rounded">/{field.state.value || 'slug'}</code>
                     </p>
                   </div>
                 )}
@@ -247,8 +312,8 @@ function SettingsPage() {
                 <Label>Avatar</Label>
                 <div className="flex items-center gap-4">
                   <div className="w-16 h-16 rounded-full overflow-hidden bg-muted flex-shrink-0 border-2 border-border/50">
-                    {form.getFieldValue('avatar') ? (
-                      <img src={form.getFieldValue('avatar')} alt="Avatar" className="w-full h-full object-cover" />
+                    {formData.getFieldValue('avatar') ? (
+                      <img src={formData.getFieldValue('avatar')} alt="Avatar" className="w-full h-full object-cover" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-purple-400 to-pink-500 text-white text-xl font-bold">
                         {profile?.nickname?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase() || '?'}
@@ -262,13 +327,13 @@ function SettingsPage() {
                       <Input type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
                     </label>
                     <p className="text-xs text-muted-foreground">PNG, JPG o GIF — max 2MB</p>
-                    {form.getFieldValue('avatar') && (
+                    {formData.getFieldValue('avatar') && (
                       <Button
                         type="button"
                         variant="ghost"
                         size="sm"
                         className="text-destructive hover:bg-destructive/10 p-0 h-auto"
-                        onClick={() => form.setFieldValue('avatar', '')}
+                        onClick={() => formData.setFieldValue('avatar', '')}
                       >
                         Rimuovi
                       </Button>
@@ -329,6 +394,15 @@ function SettingsPage() {
             {profile && (
               <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
                 <Settings className="text-muted-foreground flex-shrink-0" size={16} />
+                <div>
+                  <p className="text-xs text-muted-foreground">Slug Profilo</p>
+                  <code className="text-xs font-mono bg-background px-2 py-0.5 rounded border">/{currentSlug || 'non impostato'}</code>
+                </div>
+              </div>
+            )}
+            {profile && (
+              <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
+                <User className="text-muted-foreground flex-shrink-0" size={16} />
                 <div>
                   <p className="text-xs text-muted-foreground">ID Utente</p>
                   <code className="text-xs font-mono bg-background px-2 py-0.5 rounded border">#{profile.id}</code>

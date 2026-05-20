@@ -524,6 +524,7 @@ export const UserScalarFieldEnum = {
   refreshToken: 'refreshToken',
   name: 'name',
   nickname: 'nickname',
+  slug: 'slug',
   gender: 'gender',
   birthDate: 'birthDate',
   avatar: 'avatar',

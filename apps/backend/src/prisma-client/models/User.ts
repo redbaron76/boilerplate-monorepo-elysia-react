@@ -41,6 +41,7 @@ export type UserMinAggregateOutputType = {
   refreshToken: string | null
   name: string | null
   nickname: string | null
+  slug: string | null
   gender: $Enums.ProfileGender | null
   birthDate: Date | null
   avatar: string | null
@@ -55,6 +56,7 @@ export type UserMaxAggregateOutputType = {
   refreshToken: string | null
   name: string | null
   nickname: string | null
+  slug: string | null
   gender: $Enums.ProfileGender | null
   birthDate: Date | null
   avatar: string | null
@@ -69,6 +71,7 @@ export type UserCountAggregateOutputType = {
   refreshToken: number
   name: number
   nickname: number
+  slug: number
   gender: number
   birthDate: number
   avatar: number
@@ -93,6 +96,7 @@ export type UserMinAggregateInputType = {
   refreshToken?: true
   name?: true
   nickname?: true
+  slug?: true
   gender?: true
   birthDate?: true
   avatar?: true
@@ -107,6 +111,7 @@ export type UserMaxAggregateInputType = {
   refreshToken?: true
   name?: true
   nickname?: true
+  slug?: true
   gender?: true
   birthDate?: true
   avatar?: true
@@ -121,6 +126,7 @@ export type UserCountAggregateInputType = {
   refreshToken?: true
   name?: true
   nickname?: true
+  slug?: true
   gender?: true
   birthDate?: true
   avatar?: true
@@ -222,6 +228,7 @@ export type UserGroupByOutputType = {
   refreshToken: string | null
   name: string | null
   nickname: string | null
+  slug: string | null
   gender: $Enums.ProfileGender | null
   birthDate: Date | null
   avatar: string | null
@@ -259,6 +266,7 @@ export type UserWhereInput = {
   refreshToken?: Prisma.StringNullableFilter<"User"> | string | null
   name?: Prisma.StringNullableFilter<"User"> | string | null
   nickname?: Prisma.StringNullableFilter<"User"> | string | null
+  slug?: Prisma.StringNullableFilter<"User"> | string | null
   gender?: Prisma.EnumProfileGenderNullableFilter<"User"> | $Enums.ProfileGender | null
   birthDate?: Prisma.DateTimeNullableFilter<"User"> | Date | string | null
   avatar?: Prisma.StringNullableFilter<"User"> | string | null
@@ -273,6 +281,7 @@ export type UserOrderByWithRelationInput = {
   refreshToken?: Prisma.SortOrderInput | Prisma.SortOrder
   name?: Prisma.SortOrderInput | Prisma.SortOrder
   nickname?: Prisma.SortOrderInput | Prisma.SortOrder
+  slug?: Prisma.SortOrderInput | Prisma.SortOrder
   gender?: Prisma.SortOrderInput | Prisma.SortOrder
   birthDate?: Prisma.SortOrderInput | Prisma.SortOrder
   avatar?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -283,19 +292,20 @@ export type UserOrderByWithRelationInput = {
 export type UserWhereUniqueInput = Prisma.AtLeast<{
   id?: number
   email?: string
-  nickname?: string
+  slug?: string
   AND?: Prisma.UserWhereInput | Prisma.UserWhereInput[]
   OR?: Prisma.UserWhereInput[]
   NOT?: Prisma.UserWhereInput | Prisma.UserWhereInput[]
   passwordHash?: Prisma.StringFilter<"User"> | string
   refreshToken?: Prisma.StringNullableFilter<"User"> | string | null
   name?: Prisma.StringNullableFilter<"User"> | string | null
+  nickname?: Prisma.StringNullableFilter<"User"> | string | null
   gender?: Prisma.EnumProfileGenderNullableFilter<"User"> | $Enums.ProfileGender | null
   birthDate?: Prisma.DateTimeNullableFilter<"User"> | Date | string | null
   avatar?: Prisma.StringNullableFilter<"User"> | string | null
   createdAt?: Prisma.DateTimeFilter<"User"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"User"> | Date | string
-}, "id" | "email" | "nickname">
+}, "id" | "email" | "slug">
 
 export type UserOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
@@ -304,6 +314,7 @@ export type UserOrderByWithAggregationInput = {
   refreshToken?: Prisma.SortOrderInput | Prisma.SortOrder
   name?: Prisma.SortOrderInput | Prisma.SortOrder
   nickname?: Prisma.SortOrderInput | Prisma.SortOrder
+  slug?: Prisma.SortOrderInput | Prisma.SortOrder
   gender?: Prisma.SortOrderInput | Prisma.SortOrder
   birthDate?: Prisma.SortOrderInput | Prisma.SortOrder
   avatar?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -326,6 +337,7 @@ export type UserScalarWhereWithAggregatesInput = {
   refreshToken?: Prisma.StringNullableWithAggregatesFilter<"User"> | string | null
   name?: Prisma.StringNullableWithAggregatesFilter<"User"> | string | null
   nickname?: Prisma.StringNullableWithAggregatesFilter<"User"> | string | null
+  slug?: Prisma.StringNullableWithAggregatesFilter<"User"> | string | null
   gender?: Prisma.EnumProfileGenderNullableWithAggregatesFilter<"User"> | $Enums.ProfileGender | null
   birthDate?: Prisma.DateTimeNullableWithAggregatesFilter<"User"> | Date | string | null
   avatar?: Prisma.StringNullableWithAggregatesFilter<"User"> | string | null
@@ -339,6 +351,7 @@ export type UserCreateInput = {
   refreshToken?: string | null
   name?: string | null
   nickname?: string | null
+  slug?: string | null
   gender?: $Enums.ProfileGender | null
   birthDate?: Date | string | null
   avatar?: string | null
@@ -353,6 +366,7 @@ export type UserUncheckedCreateInput = {
   refreshToken?: string | null
   name?: string | null
   nickname?: string | null
+  slug?: string | null
   gender?: $Enums.ProfileGender | null
   birthDate?: Date | string | null
   avatar?: string | null
@@ -366,6 +380,7 @@ export type UserUpdateInput = {
   refreshToken?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   nickname?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  slug?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   gender?: Prisma.NullableEnumProfileGenderFieldUpdateOperationsInput | $Enums.ProfileGender | null
   birthDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   avatar?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -380,6 +395,7 @@ export type UserUncheckedUpdateInput = {
   refreshToken?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   nickname?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  slug?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   gender?: Prisma.NullableEnumProfileGenderFieldUpdateOperationsInput | $Enums.ProfileGender | null
   birthDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   avatar?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -394,6 +410,7 @@ export type UserCreateManyInput = {
   refreshToken?: string | null
   name?: string | null
   nickname?: string | null
+  slug?: string | null
   gender?: $Enums.ProfileGender | null
   birthDate?: Date | string | null
   avatar?: string | null
@@ -407,6 +424,7 @@ export type UserUpdateManyMutationInput = {
   refreshToken?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   nickname?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  slug?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   gender?: Prisma.NullableEnumProfileGenderFieldUpdateOperationsInput | $Enums.ProfileGender | null
   birthDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   avatar?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -421,6 +439,7 @@ export type UserUncheckedUpdateManyInput = {
   refreshToken?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   nickname?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  slug?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   gender?: Prisma.NullableEnumProfileGenderFieldUpdateOperationsInput | $Enums.ProfileGender | null
   birthDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   avatar?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -435,6 +454,7 @@ export type UserCountOrderByAggregateInput = {
   refreshToken?: Prisma.SortOrder
   name?: Prisma.SortOrder
   nickname?: Prisma.SortOrder
+  slug?: Prisma.SortOrder
   gender?: Prisma.SortOrder
   birthDate?: Prisma.SortOrder
   avatar?: Prisma.SortOrder
@@ -453,6 +473,7 @@ export type UserMaxOrderByAggregateInput = {
   refreshToken?: Prisma.SortOrder
   name?: Prisma.SortOrder
   nickname?: Prisma.SortOrder
+  slug?: Prisma.SortOrder
   gender?: Prisma.SortOrder
   birthDate?: Prisma.SortOrder
   avatar?: Prisma.SortOrder
@@ -467,6 +488,7 @@ export type UserMinOrderByAggregateInput = {
   refreshToken?: Prisma.SortOrder
   name?: Prisma.SortOrder
   nickname?: Prisma.SortOrder
+  slug?: Prisma.SortOrder
   gender?: Prisma.SortOrder
   birthDate?: Prisma.SortOrder
   avatar?: Prisma.SortOrder
@@ -515,6 +537,7 @@ export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   refreshToken?: boolean
   name?: boolean
   nickname?: boolean
+  slug?: boolean
   gender?: boolean
   birthDate?: boolean
   avatar?: boolean
@@ -529,6 +552,7 @@ export type UserSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensio
   refreshToken?: boolean
   name?: boolean
   nickname?: boolean
+  slug?: boolean
   gender?: boolean
   birthDate?: boolean
   avatar?: boolean
@@ -543,6 +567,7 @@ export type UserSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensio
   refreshToken?: boolean
   name?: boolean
   nickname?: boolean
+  slug?: boolean
   gender?: boolean
   birthDate?: boolean
   avatar?: boolean
@@ -557,6 +582,7 @@ export type UserSelectScalar = {
   refreshToken?: boolean
   name?: boolean
   nickname?: boolean
+  slug?: boolean
   gender?: boolean
   birthDate?: boolean
   avatar?: boolean
@@ -564,7 +590,7 @@ export type UserSelectScalar = {
   updatedAt?: boolean
 }
 
-export type UserOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "email" | "passwordHash" | "refreshToken" | "name" | "nickname" | "gender" | "birthDate" | "avatar" | "createdAt" | "updatedAt", ExtArgs["result"]["user"]>
+export type UserOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "email" | "passwordHash" | "refreshToken" | "name" | "nickname" | "slug" | "gender" | "birthDate" | "avatar" | "createdAt" | "updatedAt", ExtArgs["result"]["user"]>
 
 export type $UserPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "User"
@@ -576,6 +602,7 @@ export type $UserPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
     refreshToken: string | null
     name: string | null
     nickname: string | null
+    slug: string | null
     gender: $Enums.ProfileGender | null
     birthDate: Date | null
     avatar: string | null
@@ -1010,6 +1037,7 @@ export interface UserFieldRefs {
   readonly refreshToken: Prisma.FieldRef<"User", 'String'>
   readonly name: Prisma.FieldRef<"User", 'String'>
   readonly nickname: Prisma.FieldRef<"User", 'String'>
+  readonly slug: Prisma.FieldRef<"User", 'String'>
   readonly gender: Prisma.FieldRef<"User", 'ProfileGender'>
   readonly birthDate: Prisma.FieldRef<"User", 'DateTime'>
   readonly avatar: Prisma.FieldRef<"User", 'String'>
